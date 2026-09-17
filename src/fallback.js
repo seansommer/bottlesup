@@ -1,0 +1,18 @@
+import{JUICES}from'./simulation.js';
+// A functional overhead compatibility renderer for browsers without WebGL.
+// The simulation and scoring are shared with the full 3D renderer.
+export class CompatibilityScene{
+ constructor(canvas,onPick){this.canvas=canvas;this.ctx=canvas.getContext('2d');this.view='overhead';this.meshes=new Map();this.hitboxes=[];this.resize();new ResizeObserver(()=>this.resize()).observe(canvas);canvas.addEventListener('pointerdown',e=>{const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;const b=[...this.hitboxes].reverse().find(b=>Math.abs(x-b.x)<b.w/2+7&&Math.abs(y-b.y)<b.h/2+7);if(b)onPick(b.id,e.button===2,e.clientX,e.clientY);});canvas.addEventListener('contextmenu',e=>e.preventDefault());}
+ resize(){this.w=this.canvas.clientWidth;this.h=this.canvas.clientHeight;this.canvas.width=this.w*devicePixelRatio;this.canvas.height=this.h*devicePixelRatio;this.ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);}
+ setView(){}startIntro(){}burst(){}fall(){}
+ render(sim){const c=this.ctx,w=this.w,h=this.h;c.clearRect(0,0,w,h);c.fillStyle='#cbdccd';c.fillRect(0,0,w,h);this.scale=Math.min(w/17,(h-240)/8.5);this.scale=Math.max(15,this.scale);const s=this.scale,ox=w/2-.5*s,oy=Math.max(210,h*.57);this.ox=ox;this.oy=oy;const X=x=>ox+x*s,Y=z=>oy+z*s;
+ c.strokeStyle='#bed0bf';c.lineWidth=1;for(let x=0;x<w;x+=35){c.beginPath();c.moveTo(x,0);c.lineTo(x,h);c.stroke();}for(let y=0;y<h;y+=35){c.beginPath();c.moveTo(0,y);c.lineTo(w,y);c.stroke();}
+ const rect=(x,z,bw,bh,fill)=>{c.fillStyle=fill;c.beginPath();c.roundRect(X(x-bw/2),Y(z-bh/2),bw*s,bh*s,5);c.fill();};
+ rect(-4.2,-3.2,3.1,3.9,'#889d91');rect(-4.2,-3.2,2.8,3.65,'#e2e8da');rect(1,0,11.5,2.85,'#778e83');rect(1,0,11.2,2.5,'#e4e8d9');
+ c.strokeStyle='#b2c0b2';for(let i=0;i<51;i++){const x=-4.5+i*.22+(sim.stopped?0:(sim.time*sim.secondarySpeed)%.22);c.beginPath();c.moveTo(X(x),Y(-1.2));c.lineTo(X(x),Y(1.2));c.stroke();}for(let i=0;i<16;i++){const z=-4.9+i*.22+(sim.time*sim.feeder)%.22;c.beginPath();c.moveTo(X(-5.5),Y(z));c.lineTo(X(-2.9),Y(z));c.stroke();}
+ rect(-4.2,-6.0,2.7,1.8,'#a8b992');c.fillStyle='#304d32';c.textAlign='center';c.font=`700 ${Math.max(11,s*.28)}px system-ui`;c.fillText(`BIN · ${sim.binLeft}`,X(-4.2),Y(-6));c.fillText(`TILT ${Math.round(sim.tilt)}°`,X(-4.2),Y(-5.5));rect(7.45,0,1.7,3.1,'#17623e');c.save();c.translate(X(7.45),Y(0));c.rotate(-Math.PI/2);c.fillStyle='white';c.fillText('LINE 01 →',0,4);c.restore();
+ this.hitboxes=[];for(const b of sim.bottles){const x=X(b.x),y=Y(b.z);const bw=s*(b.up?.39:.82),bh=s*(b.up?.49:.35);c.save();c.translate(x,y);if(b.up){c.shadowColor='#143b3444';c.shadowBlur=3;c.shadowOffsetY=3;}c.fillStyle=b.defect==='fill'?'#c4dd99':sim.juice.color;c.beginPath();c.roundRect(-bw/2,-bh/2,bw,bh,3);c.fill();c.shadowBlur=0;c.shadowOffsetY=0;if(b.defect!=='label'){c.fillStyle=sim.juice.label;c.fillRect(-bw*.34,-bh*.3,bw*.61,bh*.6);}c.fillStyle='#f9fff1';if(b.up){c.beginPath();c.ellipse(0,-bh*.2,bw*.44,bw*.35,b.defect==='cap'?.5:0,0,Math.PI*2);c.fill();}else{c.fillRect(bw*.32,-bh*.52,bw*.18,bh*1.04);if(b.defect==='cap'){c.fillStyle='#f39b47';c.fillRect(bw*.19,-bh*.3,bw*.14,bh*.6);}}if(b.defect==='fill'){c.fillStyle='#cfe0d4';c.fillRect(-bw*.43,-bh*.4,bw*.4,bh*.8);}c.restore();if(b.belt==='secondary')this.hitboxes.push({id:b.id,x,y,w:bw,h:bh});}
+ c.fillStyle='#46674f';c.font='600 12px system-ui';c.textAlign='center';c.fillText('COMPATIBILITY VIEW · 3D is unavailable in this browser',w/2,Math.max(150,h*.27));if(sim.helpers.length){c.fillStyle='#7d40b2';c.fillText(`${sim.helpers.length} CREW HELPING`,X(1),Y(-2.0));}
+ }
+ project(id){const b=this.hitboxes.find(b=>b.id===id),r=this.canvas.getBoundingClientRect();return b?{x:b.x+r.x,y:b.y+r.y}:null;}
+}
