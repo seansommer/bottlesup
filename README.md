@@ -1,6 +1,6 @@
 # Bottles Up!
 
-Load the bin. Stand the bottles. Catch the bad ones. Find your flow.
+Load the bin. Stand the bottles. Catch the bad ones. Keep the line moving.
 
 [Play Bottles Up!](https://seansommer.github.io/bottlesup/) · [SUJA Game Center](https://seansommer.github.io/sujagamecenter/)
 
