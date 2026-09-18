@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {Simulation} from '../src/simulation.js';
-import {binSlot,fromBin,dumperPose,BELT_HEIGHT} from '../src/dumper.js';
+import {binSlot,fromBin,dumperPose} from '../src/dumper.js';
 import {crate} from '../src/models.js';
+import {fits,PRIMARY_BOUNDS,INTAKE_SLOTS} from '../src/bottle-physics.js';
 import {Palletizer} from '../src/palletizer.js';
 import {TapGesture,nearbyBottles} from '../src/picking.js';
 const advance=(s,seconds)=>{for(let i=0;i<seconds*60;i++)s.step(1/60);};
@@ -17,13 +18,13 @@ test('one bin contains its inventory before pouring, releases the same bottles, 
  const s=new Simulation({mode:'practice'});s.setFeeder(0);s.loadBin();const ids=s.bottles.map(b=>b.id);assert.equal(ids.length,s.binSize);assert.ok(s.bottles.every(b=>b.belt==='bin'));
  advance(s,2);assert.equal(s.binLeft,s.binSize);s.setLift(1);advance(s,1.15);s.setLift(0);advance(s,1);assert.equal(s.binLeft,s.binSize,'No spill below 42 degrees.');
  s.setLift(1);advance(s,.3);s.setLift(0);let sawAir=false;for(let i=0;i<14*60;i++){s.step(1/60);if(s.bottles.some(b=>b.belt==='falling'))sawAir=true;assert.equal(s.bottles.filter(b=>b.belt==='bin').length,s.binLeft);assert.equal(s.bottles.length,s.binSize);}
- assert.ok(sawAir);assert.ok(s.bottles.some(b=>b.belt==='primary'));assert.deepEqual(s.bottles.map(b=>b.id),ids);assert.ok(s.bottles.filter(b=>b.belt==='primary').every(b=>b.y===BELT_HEIGHT&&b.z>=-4.8&&b.z<=-2.1));
+ assert.ok(sawAir);assert.ok(s.bottles.some(b=>b.belt==='primary'));assert.deepEqual(s.bottles.map(b=>b.id),ids);const landed=s.bottles.filter(b=>b.belt==='primary');for(const b of landed){assert.equal(b.y,1.67+(b.layer||0)*.48);assert.ok(fits(b,landed.filter(o=>o.layer===b.layer),PRIMARY_BOUNDS),'Landed bottles stay within the belt and do not overlap their layer.');}
 });
 test('airborne bottles pause in place and cannot be tapped or counted as good output',()=>{
  const s=new Simulation({mode:'practice'});s.loadBin();advance(s,1.3);s.setLift(1);advance(s,2);s.setLift(0);const b=s.bottles.find(b=>b.belt==='falling');assert.ok(b);assert.equal(s.action(b.id),false);assert.equal(s.action(b.id,true),false);s.paused=true;const before=structuredClone(b);advance(s,3);assert.deepEqual(b,before);assert.equal(s.delivered,0);
 });
 test('only accepted good exits enter the batch packing count',()=>{
- const s=new Simulation();for(const [lane,defect,up] of [[0,null,true],[1,'cap',true],[2,null,false]])Object.assign(s.addBottle(),{belt:'secondary',x:6,z:(lane-2)*.48,lane,up,defect,finicky:false});advance(s,2);assert.equal(s.delivered,1);assert.equal(s.batchDelivered,1);assert.equal(s.waste,2);
+ const s=new Simulation();s.binsLoaded=s.binsRequired;for(const [slot,defect,up] of [[0,null,true],[2,'cap',true],[4,null,false]])Object.assign(s.addBottle(),{belt:'secondary',x:6.25,z:INTAKE_SLOTS[slot],gateSlot:slot,rotation:Math.PI/2,up,defect,finicky:false});advance(s,3);assert.equal(s.delivered,1);assert.equal(s.batchDelivered,1);assert.equal(s.waste,2);assert.equal(s.stragglers,1);
 });
 test('manual packing requires wrap before place and never duplicates a six-pack',()=>{
  const p=new Palletizer(13);assert.equal(p.total,2);assert.equal(p.loose,1);assert.equal(p.place(),false);assert.equal(p.wrap(),true);assert.equal(p.wrap(),false);p.step(.8);assert.equal(p.phase,'wrapped');assert.equal(p.stacked,0);assert.equal(p.place(),true);assert.equal(p.place(),false);p.step(.8);assert.equal(p.stacked,1);assert.equal(p.phase,'ready');p.auto=true;for(let i=0;i<180;i++)p.step(1/60);assert.equal(p.phase,'done');assert.equal(p.stacked,2);p.step(100);assert.equal(p.stacked*6+p.loose,13);
@@ -39,5 +40,5 @@ test('tap targets are forgiving, but drags and pinches can never activate bottle
  assert.deepEqual(nearbyBottles([{id:1,x:100,y:100},{id:2,x:108,y:100},{id:3,x:180,y:100}],104,107),[1,2]);
 });
 test('confirming an old bottle ID cannot reject its neighbor after it leaves',()=>{
- const s=new Simulation();const a=Object.assign(s.addBottle(),{belt:'secondary',lane:0,x:6,z:-.96,up:true,defect:null,finicky:false}),b=Object.assign(s.addBottle(),{belt:'secondary',lane:1,x:1,z:-.48,up:false,defect:null,finicky:false});advance(s,.1);const score=s.score;assert.equal(s.action(a.id,true),false);assert.ok(s.bottles.includes(b));assert.equal(s.score,score);
+ const s=new Simulation();const row=INTAKE_SLOTS.map((z,gateSlot)=>Object.assign(s.addBottle(),{belt:'secondary',x:6.25,z,gateSlot,up:true,defect:null,finicky:false}));const b=Object.assign(s.addBottle(),{belt:'secondary',x:1,z:-.48,up:false,defect:null,finicky:false});advance(s,.1);const score=s.score;assert.equal(s.action(row[0].id,true),false);assert.ok(s.bottles.includes(b));assert.equal(s.score,score);
 });

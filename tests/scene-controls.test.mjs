@@ -22,3 +22,18 @@ test('the 3D pallet contains six bottles per finished pack and no duplicate acti
  assert.equal(scene.packs.length,2);for(const pack of scene.packs)assert.equal(pack.children.filter(x=>x.name==='SujaBottle').length,6);assert.equal(scene.work.visible,false);
  scene.products.traverse(o=>{if(o.isMesh){o.updateWorldMatrix(true,false);assert.ok(o.matrixWorld.elements.every(Number.isFinite));}});
 });
+
+test('saved camera survives a new scene and packing view changes cannot overwrite it',()=>{
+ const makeRig=()=>{const doc=new EventTarget(),el=new EventTarget();Object.assign(el,{style:{},ownerDocument:doc,getRootNode:()=>doc,clientHeight:790,clientWidth:390});const rig=Object.create(FactoryScene.prototype);rig.camera=new THREE.PerspectiveCamera(47,390/790,.1,90);rig.controls=new OrbitControls(rig.camera,el);Object.assign(rig.controls,{minDistance:3,maxDistance:42,minPolarAngle:.08,maxPolarAngle:Math.PI*.47});rig.setView('first');return rig;};
+ const a=makeRig();a.cameraAction('in');a.cameraAction('rotate-right');a.cameraAction('up');const saved=a.getCamera();const b=makeRig();assert.equal(b.restoreCamera(JSON.parse(JSON.stringify(saved))),true);assert.ok(a.camera.position.distanceTo(b.camera.position)<1e-6);assert.ok(a.controls.target.distanceTo(b.controls.target)<1e-6);
+ b.setPacking(new Palletizer(12));b.setView('overhead');assert.deepEqual(b.getCamera(),saved);b.setPacking(null);assert.deepEqual(b.getCamera(),saved);a.controls.dispose();b.controls.dispose();
+});
+
+test('collision capsules enclose the visible lying bottle models, including crooked caps',async()=>{
+ const {footprint}=await import('../src/bottle-physics.js');
+ for(const defect of [null,'label','cap','fill']){
+  const group=new THREE.Group(),model=bottle({defect});model.position.y=-.44;group.add(model);group.rotation.z=Math.PI/2;group.updateMatrixWorld(true);
+  const capsule=footprint({x:0,z:0,up:false,rotation:0,defect});
+  group.traverse(o=>{if(o.isMesh){const vertices=o.geometry.attributes.position;for(let i=0;i<vertices.count;i++){const p=new THREE.Vector3().fromBufferAttribute(vertices,i).applyMatrix4(o.matrixWorld);const nearest=Math.max(capsule.ax,Math.min(capsule.bx,p.x));assert.ok(Math.hypot(p.x-nearest,p.z)<=capsule.r+1e-6,`${defect||'good'} bottle fits its collider`);}}});
+ }
+});

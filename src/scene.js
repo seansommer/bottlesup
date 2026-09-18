@@ -5,16 +5,22 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {TapGesture,nearbyBottles} from './picking.js';
 import {binSlot,fromBin,dumperPose} from './dumper.js';
 import {PackingScene} from './packing-scene.js';
+import {PlantControls} from './plant-controls.js';
+import {installEquipmentInput} from './equipment-input.js';
+import {PLANT} from './control-state.js';
+import {validCamera} from './shift-features.js';
 import {JUICES} from './simulation.js';
 export class FactoryScene{
- constructor(canvas,onPick){
+ constructor(canvas,onPick,onControl=()=>{}){
+  this.kind='3d';this.interactionActive=false;this.intakes=[];
   this.canvas=canvas;this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.18;
   this.scene=new THREE.Scene();this.scene.background=new THREE.Color('#d8e8df');this.scene.fog=new THREE.Fog('#d8e8df',24,65);this.camera=new THREE.PerspectiveCamera(47,1,.1,90);this.ray=new THREE.Raycaster();this.pointer=new THREE.Vector2();this.view='first';this.meshes=new Map();this.pool=new Map();this.particles=[];this.clock=0;this.cameraTarget=new THREE.Vector3();this.intro=0;this.labels=JUICES.map(j=>this.label(j));this.models=JUICES.map((j,i)=>Object.fromEntries([null,'label','cap','fill'].map(d=>[d||'good',bottle({...j,texture:this.labels[i],defect:d})])));
   this.scene.add(new THREE.HemisphereLight(0xf1fff8,0x52675b,2.5));const sun=new THREE.DirectionalLight(0xfff7e7,4);sun.position.set(-4,13,8);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-12,right:12,top:13,bottom:-12,near:.5,far:40});sun.shadow.bias=-.001;sun.shadow.normalBias=.035;this.scene.add(sun);const rim=new THREE.DirectionalLight(0xbdc6ff,1.5);rim.position.set(5,8,-9);this.scene.add(rim);
-  this.buildPlant();this.packingScene=new PackingScene(this.scene,this.models);this.loadModels();this.resize();
+  this.buildPlant();this.packingScene=new PackingScene(this.scene,this.models);this.packingScene.group.position.x=1.25;this.plantControls=new PlantControls(this.scene,this.models);this.loadModels();this.resize();
   this.controls=new OrbitControls(this.camera,canvas);this.controls.enableDamping=true;this.controls.dampingFactor=.14;this.controls.minDistance=3;this.controls.maxDistance=42;this.controls.minPolarAngle=.08;this.controls.maxPolarAngle=Math.PI*.47;this.controls.screenSpacePanning=true;this.controls.rotateSpeed=.65;this.controls.zoomSpeed=.75;
-  this.controls.addEventListener('start',()=>{this.intro=0;});this.setView('first');
+  this.controls.addEventListener('start',()=>{this.intro=0;this.cameraUserDriven=true;});this.controls.addEventListener('change',()=>{if(this.cameraUserDriven&&!this.packing&&!this.intro)this.onCameraChanged?.();});this.setView('first');
   this.observer=new ResizeObserver(()=>this.resize());this.observer.observe(canvas);
+  this.equipmentInput=installEquipmentInput(canvas,(x,y)=>this.hitControl(x,y),(id,phase)=>{if(phase!=='end')this.plantControls.press(id);onControl(id,phase);},captured=>this.controls.enabled=!captured);
   const gesture=new TapGesture();
   canvas.addEventListener('pointerdown',e=>gesture.down(e));canvas.addEventListener('pointermove',e=>gesture.move(e));
   canvas.addEventListener('pointercancel',e=>gesture.cancel(e));canvas.addEventListener('lostpointercapture',e=>gesture.cancel(e));
@@ -36,10 +42,16 @@ export class FactoryScene{
   this.backWall=box(34,8,.25,new THREE.MeshStandardMaterial({color:0xe1eae3,roughness:1}),0,3.8,-11);this.leftWall=box(.3,8,26,M.white,-13,3.8,-2);this.scene.add(this.backWall,this.leftWall);
   for(let x=-12;x<17;x+=3)this.scene.add(box(.025,7.5,.03,M.steel,x,3.75,-10.84,0));
   const wordmark=this.textSign('suja',5,1.25,'#086139','#ffffff',178);wordmark.position.set(4.7,4.1,-10.8);this.scene.add(wordmark);const sign=this.textSign('BOTTLING HALL  /  01',4,.65,'#e1eae3','#246044',42);sign.position.set(4.7,3.06,-10.77);this.scene.add(sign);
-  this.primary=this.belt(2.9,3.6,-4.2,-3.32);this.secondary=this.belt(11.25,2.55,1,0);
+  this.primary=this.belt(2.9,3.6,-4.2,-3.32);this.secondary=this.belt(PLANT.beltLength,PLANT.beltWidth,1,0);
   // Feed motor, fixed-speed machine and overhead pipework.
-  this.scene.add(cyl(.29,.29,.55,M.green,-5.86,1.13,-2),box(1.55,2.25,2.9,M.steel,7.45,1.13,0,.16),box(1.6,.33,2.94,M.green,7.45,2.27,0,.08));const exit=this.textSign('LINE 01',1.25,.4);exit.position.set(7.45,1.63,1.47);this.scene.add(exit);
-  const tower=cyl(.065,.065,.7,M.dark,8.0,2.73,0);this.scene.add(tower);this.light=sphere(.15,new THREE.MeshStandardMaterial({color:0x39e884,emissive:0x10b151,emissiveIntensity:1.5}),8,3.2,0);this.scene.add(this.light);
+  this.scene.add(cyl(.29,.29,.55,M.green,-5.86,1.13,-2));
+  const length=PLANT.machineLength,mx=PLANT.machineX;
+  this.scene.add(box(length,.58,3.12,M.steel,mx,.3,0,.12),box(length+.08,.33,3.14,M.green,mx,2.4,0,.09));
+  const glass=new THREE.MeshPhysicalMaterial({color:0x75cda4,transparent:true,opacity:.24,roughness:.16,metalness:.15});
+  for(const z of [-1.5,1.5]){this.scene.add(box(length,.62,.13,M.steel,mx,.88,z),box(length-.3,.8,.05,glass,mx,1.62,z));for(const x of [mx-length/2+.07,mx+length/2-.07])this.scene.add(box(.15,1.5,.15,M.steel,x,1.53,z));}
+  this.scene.add(box(length,.07,2.95,M.white,mx,1.39,0));
+  const exit=this.textSign('SIX-PACK LINE 01',length-.2,.34);exit.position.set(mx,2.4,1.59);this.scene.add(exit);
+  const tower=cyl(.065,.065,.7,M.dark,mx+.75,2.92,0);this.scene.add(tower);this.light=sphere(.15,new THREE.MeshStandardMaterial({color:0x39e884,emissive:0x10b151,emissiveIntensity:1.5}),mx+.75,3.38,0);this.scene.add(this.light);
   for(let x=-8;x<=10;x+=6){this.scene.add(box(.11,5.5,.11,M.steel,x,2.75,-9.5));const pipe=cyl(.065,.065,17,M.steel,0,5.43,-9.5);pipe.rotation.z=Math.PI/2;this.scene.add(pipe);const glow=box(3,.075,.5,new THREE.MeshStandardMaterial({color:0xffffff,emissive:0xffffff,emissiveIntensity:2}),x,6.3,-4);this.scene.add(glow);}
   for(let i=0;i<3;i++){const stack=crate();stack.position.set(-9.1,0,-7+i*2.4);this.scene.add(stack);const upper=crate();upper.position.set(-9.1,1.85,-7+i*2.4);this.scene.add(upper);}
   // Hinged dumper with hydraulic arms; bin rotates about the conveyor-facing lip.
@@ -52,16 +64,16 @@ export class FactoryScene{
   const panel=this.textSign('FEEDER',.95,.3);panel.position.set(-5.74,1.19,-1.46);this.scene.add(panel);
  }
  resize(){const w=this.canvas.clientWidth,h=this.canvas.clientHeight;if(!w||!h)return;this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();}
- setView(view){
-  this.view=view;this.intro=0;const narrow=this.camera.aspect<.8;
-  if(this.packing){this.camera.position.set(14.8,narrow?12:7.6,narrow?18:11.5);this.controls.target.set(10.6,1.4,3.2);}
-  else if(view==='overhead'){this.camera.position.set(.5,narrow?26:20,1.5);this.controls.target.set(.5,0,-2);}
-  else{this.camera.position.set(narrow?2.8:1.5,narrow?9.5:4.7,narrow?17.8:10.8);this.controls.target.set(.1,1.2,-1.8);}
+ setView(view,notify=true){
+  this.cameraUserDriven=false;this.flushCamera();this.cameraUserDriven=notify;this.view=view;this.intro=0;const narrow=this.camera.aspect<.8;
+  if(this.packing){this.camera.position.set(16.05,narrow?12:7.6,narrow?18:11.5);this.controls.target.set(11.85,1.4,3.2);}
+  else if(view==='overhead'){this.camera.position.set(.8,narrow?40:20,1.5);this.controls.target.set(.8,0,-2);}
+  else{this.camera.position.set(narrow?.7:1.5,narrow?29:4.7,narrow?29:10.8);this.controls.target.set(narrow?.8:.1,1.2,-1.8);}
   this.flushCamera();
  }
  flushCamera(){const damping=this.controls.enableDamping;this.controls.enableDamping=false;this.controls.update();this.controls.enableDamping=damping;}
  cameraAction(action){
-  this.intro=0;if(action==='reset'){this.setView(this.view);return;}
+  this.intro=0;this.cameraUserDriven=true;if(action==='reset'){this.setView(this.view);return;}
   this.flushCamera();const offset=this.camera.position.clone().sub(this.controls.target),s=new THREE.Spherical().setFromVector3(offset);
   if(action==='in'||action==='out')s.radius=THREE.MathUtils.clamp(s.radius*(action==='in'?.82:1.22),3,42);
   if(action==='rotate-left'||action==='rotate-right')s.theta+=(action==='rotate-left'?-1:1)*Math.PI/10;
@@ -71,11 +83,12 @@ export class FactoryScene{
   if(directions[action]){const [axis,sign]=directions[action],move=new THREE.Vector3().setFromMatrixColumn(this.camera.matrix,axis).multiplyScalar(sign*s.radius*.07);this.controls.target.add(move);this.camera.position.add(move);}
   this.controls.update();
  }
- focus(id){const m=this.meshes.get(id);if(!m)return;this.intro=0;this.flushCamera();const direction=this.camera.position.clone().sub(this.controls.target).normalize();this.controls.target.copy(m.position);this.camera.position.copy(m.position).addScaledVector(direction,5);this.controls.update();}
+ focus(id){const m=this.meshes.get(id);if(!m)return;this.intro=0;this.cameraUserDriven=true;this.flushCamera();const direction=this.camera.position.clone().sub(this.controls.target).normalize();this.controls.target.copy(m.position);this.camera.position.copy(m.position).addScaledVector(direction,5);this.controls.update();}
  setSelection(id){this.selectedId=id;}
  setPacking(packing){
-  if(packing&&!this.packing){this.savedCamera={position:this.camera.position.clone(),target:this.controls.target.clone()};this.packing=packing;this.setView(this.view);}
-  else if(!packing&&this.packing){this.packing=null;if(this.savedCamera){this.camera.position.copy(this.savedCamera.position);this.controls.target.copy(this.savedCamera.target);this.flushCamera();}}
+  this.equipmentInput?.cancel();this.cameraUserDriven=false;
+  if(packing&&!this.packing){this.savedCamera={view:this.view,position:this.camera.position.clone(),target:this.controls.target.clone()};this.packing=packing;this.setView(this.view,false);}
+  else if(!packing&&this.packing){this.packing=null;if(this.savedCamera){this.view=this.savedCamera.view;this.camera.position.copy(this.savedCamera.position);this.controls.target.copy(this.savedCamera.target);this.flushCamera();}}
   this.packing=packing;
  }
  project(id){const m=this.meshes.get(id);if(!m)return null;const p=m.position.clone().project(this.camera);if(p.z>1||p.z< -1)return null;const r=this.canvas.getBoundingClientRect();return{x:r.x+(p.x+1)*r.width/2,y:r.y+(1-p.y)*r.height/2};}
@@ -85,10 +98,15 @@ export class FactoryScene{
   const hits=this.ray.intersectObjects(bottles.map(b=>this.meshes.get(b.id)).filter(Boolean),true),exact=hits[0]?.object.userData.bottleId;
   if(exact)return [exact,...candidates.filter(id=>id!==exact)];return candidates;
  }
- startIntro(){this.setView(this.view);if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;this.intro=2;this.introPosition=this.camera.position.clone();this.camera.position.x+=3;this.camera.position.y+=2;}
+ getCamera(){const saved=this.packing?this.savedCamera:null;return {version:1,kind:'3d',view:saved?.view||this.view,position:(saved?.position||this.camera.position).toArray(),target:(saved?.target||this.controls.target).toArray()};}
+ restoreCamera(value){const p=validCamera(value);if(!p||p.kind!=='3d')return false;this.cameraUserDriven=false;this.intro=0;this.flushCamera();this.view=p.view;this.camera.position.fromArray(p.position);this.controls.target.fromArray(p.target);this.flushCamera();return true;}
+ startIntro(){this.intro=0;}
+ setInteraction(active,{reduced=false,inspect=false}={}){if(!active)this.equipmentInput?.cancel();this.interactionActive=active;this.reduced=reduced;if(this.plantControls)this.plantControls.inspecting=inspect;}
+ hitControl(x,y){if(!this.interactionActive||this.packing)return null;const r=this.canvas.getBoundingClientRect();this.pointer.set((x-r.left)/r.width*2-1,-(y-r.top)/r.height*2+1);this.ray.setFromCamera(this.pointer,this.camera);return this.plantControls.hit(this.ray,this.camera,this.canvas,x,y,(this.simRef?.secondary||[]).map(b=>this.meshes.get(b.id)).filter(Boolean));}
+ intake(event){for(const b of event.bottles){const source=this.meshes.get(b.id);if(!source)continue;const m=source.clone();this.scene.add(m);this.intakes.push({mesh:m,age:0});}}
 
  burst(x,z,color=0x93f160){for(let i=0;i<10;i++){const m=box(.065,.065,.065,new THREE.MeshBasicMaterial({color}),x,2,z);this.scene.add(m);this.particles.push({m,v:new THREE.Vector3((Math.random()-.5)*2,1+Math.random()*2,(Math.random()-.5)*2),life:.7});}}
- render(sim,dt){if(this.simRef!==sim){for(const m of this.meshes.values())this.scene.remove(m);this.meshes.clear();this.simRef=sim;}this.clock+=dt;
+ render(sim,dt){if(this.simRef!==sim){for(const m of this.meshes.values())this.scene.remove(m);this.meshes.clear();for(const item of this.intakes)this.scene.remove(item.mesh);this.intakes=[];this.simRef=sim;}this.clock+=dt;
   if(this.intro>0){this.intro=Math.max(0,this.intro-dt);this.camera.position.copy(this.introPosition);this.camera.position.x+=this.intro*1.5;this.camera.position.y+=this.intro;}
   this.controls.update();this.backWall.visible=this.camera.position.z> -10.6;this.leftWall.visible=this.camera.position.x> -12.6;
   const activeIds=new Set(sim.bottles.map(b=>b.id));for(const[id,m]of this.meshes){if(!activeIds.has(id)){this.scene.remove(m);this.meshes.delete(id);}}
@@ -97,11 +115,12 @@ export class FactoryScene{
    let m=this.meshes.get(b.id);if(!m){m=new THREE.Group();const model=this.models[(sim.level-1)%4][b.defect||'good'].clone();model.position.y=-.44;m.add(model);m.traverse(o=>{o.userData.bottleId=b.id;});this.meshes.set(b.id,m);this.scene.add(m);}
    if(b.belt==='bin'){const p=fromBin(binSlot(b.slot),sim.tilt,loading);m.position.set(p.x,p.y,p.z);m.rotation.set(Math.PI/2+sim.tilt*Math.PI/180,0,0);}
    else if(b.belt==='falling'){m.position.set(b.x,b.y,b.z);m.rotation.set(b.spin||0,b.rotation,0);}
-   else {m.position.set(b.x,b.up?1.88:1.67,b.z);m.rotation.x=0;m.rotation.z=THREE.MathUtils.damp(m.rotation.z,b.up?0:Math.PI/2,18,dt);m.rotation.y=b.up?0:b.rotation;}
+   else {m.position.set(b.x,b.up?1.88:1.67+(b.belt==='primary'?(b.layer||0)*.48:0),b.z);m.rotation.x=0;m.rotation.z=b.up?0:Math.PI/2;m.rotation.y=b.up?0:-b.rotation;}
   }
   const pose=dumperPose(sim.tilt,loading);this.dumper.rotation.x=pose.angle;this.dumper.position.set(pose.x,pose.y,pose.z);this.bin.visible=sim.binState!=='empty'||sim.tilt>5;this.jack.position.z=sim.binState==='loading'?-9+loading*2:-7;
   const selected=this.meshes.get(this.selectedId);this.selection.visible=!!selected&&!this.packing;if(selected){this.selection.position.set(selected.position.x,1.48,selected.position.z);}
-  this.packingScene.update(this.packing);
+  this.packingScene.update(this.packing);this.plantControls.group.visible=!this.packing;this.plantControls.rejectGroup.visible=!this.packing;this.plantControls.gateLabel.visible=!this.packing;this.plantControls.gatePads.forEach(p=>p.visible=!this.packing);this.plantControls.update(sim,dt,this.clock,this.interactionActive,this.reduced);
+  for(const item of this.intakes){if(!sim.paused){item.age+=dt;item.mesh.position.x+=dt*3.8;}if(item.age>.85)this.scene.remove(item.mesh);}this.intakes=this.intakes.filter(item=>item.age<=.85);
   for(const belt of [this.primary,this.secondary]){const speed=sim.paused||sim.ended||sim.batchReady?0:belt===this.primary?sim.feeder*2.6:sim.stopped?0:sim.secondarySpeed;belt.phase=(belt.phase+speed*dt)%.18;for(let i=0;i<belt.slats.length;i++){const p=-(belt.longX?belt.w:belt.d)/2+i*.18+belt.phase;if(belt.longX)belt.slats[i].position.x=p;else belt.slats[i].position.z=p;}}
   for(let i=0;i<4;i++){const w=this.crew[i];w.visible=i<sim.helpers.length;w.userData.arms.forEach((a,j)=>a.rotation.x=-.55+Math.sin(this.clock*5+i+j)*.5);}
   this.light.material.color.set(sim.stopped?'#a370ed':sim.fullFlow?'#eff98b':'#39e884');this.light.material.emissive.copy(this.light.material.color);
