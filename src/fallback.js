@@ -5,6 +5,7 @@ import {INTAKE_SLOTS,intakeReady} from './bottle-physics.js';
 import {TapGesture,nearbyBottles} from './picking.js';
 import {binSlot,fromBin} from './dumper.js';
 import {JUICES} from './simulation.js';
+import {CONTROL_VISUALS,drawControlIcon} from './control-visuals.js';
 // The same simulation stays playable on browsers without WebGL.
 export class CompatibilityScene {
  constructor(canvas,onPick,onControl=()=>{}) {
@@ -63,11 +64,19 @@ export class CompatibilityScene {
   const states=controlState(sim,this.interactionActive),pulse=this.reduced?1:.5+.5*Math.sin(this.clock*5);
   for(const [id,pos] of Object.entries(CONTROL_POSITIONS)){
    const state=states[id];if(id==='bonus'&&!sim.pendingReward)continue;const [x,,z]=pos;
-   c.fillStyle=state.glow?`rgba(143,239,91,${.35+pulse*.5})`:'#607967';c.beginPath();c.arc(x,z,id==='load'?.64:.38,0,Math.PI*2);c.fill();
-   box(x,z,id==='load'?1.1:.55,id==='load'?.9:.55,id==='bonus'?`hsl(${(this.reduced?45:this.clock*40%360)} 70% 65%)`:id==='stop'||id==='inspect'?'#9865bf':state.enabled?'#5eae70':'#a4b7a7');
-   c.fillStyle='#fafff5';c.textAlign='center';c.font='900 .35px system-ui';c.fillText(id==='raise'?'↑':id==='lower'?'↓':id==='slower'?'−':id==='faster'?'+':id==='bonus'?'?':id==='load'?'BIN':id==='stop'?'Ⅱ':'QA',x,z+.12);
+   const style=CONTROL_VISUALS[id],size=Math.max(id==='load'?1.08:.8,22/s),r=size/2;
+   c.save();c.globalAlpha=state.enabled?1:.5;c.fillStyle=style.light;c.beginPath();c.arc(x,z,r*1.3,0,Math.PI*2);c.fill();
+   if(state.glow){c.strokeStyle=style.color;c.globalAlpha=.45+pulse*.55;c.lineWidth=.08;c.stroke();c.globalAlpha=1;}
+   c.fillStyle=id==='bonus'?`hsl(${this.reduced?275:this.clock*40%360} 65% 55%)`:style.color;c.beginPath();
+   if(id==='raise'||id==='lower'){const d=id==='raise'?1:-1;c.moveTo(x,z-r*d);c.lineTo(x+r,z+r*d);c.lineTo(x-r,z+r*d);c.closePath();}
+   else if(id==='stop'){for(let i=0;i<8;i++){const a=(i+.5)*Math.PI/4;if(i)c.lineTo(x+Math.cos(a)*r,z+Math.sin(a)*r);else c.moveTo(x+Math.cos(a)*r,z+Math.sin(a)*r);}c.closePath();}
+   else if(id==='inspect')c.arc(x,z,r,0,Math.PI*2);
+   else if(id==='slower')c.roundRect(x-r,z-r*.4,size,size*.4,.08);
+   else if(id==='faster'){c.rect(x-r*.35,z-r,size*.35,size);c.rect(x-r,z-r*.35,size,size*.35);}
+   else c.roundRect(x-r,z-r,size,size,.1);
+   c.fill();if(id!=='slower'&&id!=='faster')drawControlIcon(c,id,x-r*.69,z-r*.69,size*.69);c.restore();
    this.controlHitboxes.push({id,enabled:state.enabled,x:rect.x+ox+(x*cos-z*sin)*s,y:rect.y+oy+(x*sin+z*cos)*s,radius:Math.max(23,s*.4)});
-   c.font='800 .25px system-ui';c.fillStyle='#214c30';c.fillText(id==='inspect'&&this.inspecting?'STAND':state.label,x,z-.52);
+   c.font='800 .25px system-ui';c.fillStyle=style.color;c.textAlign='center';c.fillText(id==='inspect'&&this.inspecting?'INSPECT ON':state.label,x,z-r-.2);
   }
   c.font='800 .29px system-ui';c.fillStyle='#264e36';c.fillText(`${Math.round(sim.feeder*100)}% FEEDER`,-4.95,3.6);c.fillText(`${sim.queueCount}/6 READY`,6.4,2.05);
   box(4.65,3.2,2,1.6,'#8c6ca9');for(let i=0;i<Math.min(14,sim.rejectBinCount);i++)box(4.0+i%4*.37,2.74+Math.floor(i/4)*.31,.27,.15,'#b4d688');c.fillStyle='#3b254e';c.fillText(`REJECT BIN · ${sim.rejectBinCount}`,4.65,4.3);

@@ -8,8 +8,13 @@ import {PlayerPreferences,PhraseBag,ShiftCountdown,flowProgress} from './shift-f
 import {controlState} from './control-state.js';
 import {BonusBadge} from './bonus-cube.js';
 import {DefectTutorial} from './tutorial.js';
+import {CONTROL_VISUALS,controlIcon} from './control-visuals.js';
 
 const $=id=>document.getElementById(id),audio=new AudioEngine(),community=new Community();
+for(const button of document.querySelectorAll('[data-control-icon]')){
+ const id=button.dataset.controlIcon,style=CONTROL_VISUALS[id];
+ button.insertAdjacentHTML('afterbegin',controlIcon(id));button.style.setProperty('--control-color',style.color);button.style.setProperty('--control-light',style.light);
+}
 const preferences=new PlayerPreferences(localStorage),phrases=new PhraseBag();
 let mode='shift',playing=false,rejectMode=false,scene,sim,last=0,accumulator=0,eventTimer;
 let runId,runOwner=null,pendingResult=null,challenge=null;
@@ -32,7 +37,7 @@ function handleEvent(e){
   notice(labels[e.kind]);
  }
  if(e.type==='waste')notice(e.why==='defect'?'Bad bottle reached the machine · −60':'Bottle lost · −35');
- if(e.type==='fullFlow')notice('FULL FLOW! Triple points for 10 seconds');
+ if(e.type==='fullFlow')notice('BOTTLE BLITZ! Triple points for 10 seconds');
  if(e.type==='level')notice(`Juice ${e.level}: ${e.juice} · +300`);
  if(e.type==='wobble')notice('Bottle down! Check downstream.');
  if(e.type==='stand'&&!reduced)scene.burst(e.x,e.z);
@@ -65,9 +70,11 @@ function updateVisibility(){
  $('controls').hidden=!toolsVisible||!dashboard;
  $('dash-toggle').hidden=!toolsVisible;
  $('quick-inspect').hidden=!toolsVisible||dashboard;
- $('hint').hidden=!toolsVisible;
+ $('hint').hidden=!toolsVisible||dashboard;
  $('dash-toggle').setAttribute('aria-expanded',String(dashboard));
- $('dash-toggle-label').textContent=dashboard?'Hide controls':'Controls';
+ $('dash-toggle-label').textContent=dashboard?'Hide dashboard':'Dashboard';
+ $('dash-toggle-icon').textContent=dashboard?'×':'☷';
+ $('dash-toggle').setAttribute('aria-label',dashboard?'Hide dashboard':'Show dashboard');
  $('dash-toggle').classList.toggle('bonus-ready',!!sim?.pendingReward);
  $('dash-bonus').hidden=!sim?.pendingReward;
  document.body.classList.toggle('dash-open',toolsVisible&&dashboard);
@@ -196,8 +203,8 @@ function updateHud(){
  for(const [id,state]of [['load','load'],['raise','raise'],['lower','lower'],['stop-belt','stop']]){$(id).disabled=!controls[state].enabled;$(id).classList.toggle('suggested',controls[state].glow);}
  $('tilt-label').textContent=`Tilt ${Math.round(sim.tilt)}°`;$('bin-left').textContent=sim.binState==='loading'?'Loading…':sim.binLeft?`${sim.binLeft} bottles left`:'Bin empty';$('bin-counter').textContent=`BIN ${sim.binsLoaded} / ${sim.binsRequired}`;
  $('speed').value=Math.round(sim.feeder*100);$('speed-value').textContent=`${Math.round(sim.feeder*100)}%`;
- $('stop-belt').textContent=sim.stopped?`Stopped ${Math.ceil(sim.stopUntil-sim.time)}s`:`Stop ×${sim.cards}`;
- $('mystery').disabled=!controls.bonus.enabled;$('mystery').classList.toggle('ready',!!sim.pendingReward);$('bonus-label').textContent=sim.pendingReward?'Tap your bonus':'Bonus charging';
+ $('stop-label').textContent=sim.stopped?`Stop · ${Math.ceil(sim.stopUntil-sim.time)}s`:`Stop ×${sim.cards}`;
+ $('mystery').disabled=!controls.bonus.enabled;$('mystery').classList.toggle('ready',!!sim.pendingReward);$('bonus-label').textContent=sim.pendingReward?'Ready!':'Bonus';
  $('mystery').setAttribute('aria-label',sim.pendingReward?'Open rainbow mystery bonus':'Mystery bonus charging');
  $('reject-count').textContent=`Reject bin · ${sim.rejectBinCount}`;$('queue-count').textContent=`${sim.queueCount} / 6 at intake`;
  const statuses=[];
@@ -206,7 +213,7 @@ function updateHud(){
  $('bonus-status').textContent=statuses.join(' · ');$('bonus-status').hidden=!!packing||sim.ended||!!countdown||!statuses.length;
  let hint=rejectMode?'Inspect mode · Tap a bottle for a close look.':'Tap fallen bottles · Six standing bottles make a pack.';
  if(sim.binState==='loading')hint='Pallet jack moving the bin into position…';
- else if(!sim.binsLoaded)hint='Tap the glowing bin to load. Controls are below if you need them.';
+ else if(!sim.binsLoaded)hint='Tap the glowing bin to load. The Dashboard button opens extra controls.';
  else if(sim.binLeft&&sim.tilt<43)hint='Hold ↑ past 42° to pour. Release to hold the angle.';
  else if(!sim.binLeft&&sim.binsLoaded<sim.binsRequired)hint=sim.tilt>.1?'Clear the feeder, then hold ↓ to lower the dumper.':'Tap the glowing bin to load your next one.';
  else if(sim.bottles.filter(b=>b.belt==='primary').length>25)hint='A busy feeder! Try a gentler pour.';

@@ -8,10 +8,10 @@ export function controlState(sim,active=true){
  const load=sim.binState==='empty'&&sim.tilt<=.1&&sim.binsLoaded<sim.binsRequired;
  return {
   load:{enabled:ready&&load,glow:ready&&load,label:'LOAD BIN'},
-  raise:{enabled:ready&&sim.binState==='ready'&&sim.binLeft>0&&sim.tilt<100,glow:ready&&sim.binState==='ready'&&sim.binLeft>0&&sim.tilt<=42,label:'HOLD ↑'},
-  lower:{enabled:ready&&sim.binState!=='loading'&&sim.tilt>0,glow:ready&&sim.binState==='empty'&&firstClear&&sim.tilt>0,label:'HOLD ↓'},
-  slower:{enabled:ready&&sim.feeder>0,glow:false,label:'SPEED −'},
-  faster:{enabled:ready&&sim.feeder<1,glow:false,label:'SPEED +'},
+  raise:{enabled:ready&&sim.binState==='ready'&&sim.binLeft>0&&sim.tilt<100,glow:ready&&sim.binState==='ready'&&sim.binLeft>0&&sim.tilt<=42,label:'RAISE · HOLD'},
+  lower:{enabled:ready&&sim.binState!=='loading'&&sim.tilt>0,glow:ready&&sim.binState==='empty'&&firstClear&&sim.tilt>0,label:'LOWER · HOLD'},
+  slower:{enabled:ready&&sim.feeder>0,glow:false,label:'SLOWER'},
+  faster:{enabled:ready&&sim.feeder<1,glow:false,label:'FASTER'},
   stop:{enabled:ready&&sim.cards>0,glow:ready&&sim.cards>0&&sim.pressure>1,label:sim.stopped?`STOPPED ${Math.ceil(sim.stopUntil-sim.time)}s`:`STOP ×${sim.cards}`},
   inspect:{enabled:ready,glow:false,label:'INSPECT'},
   bonus:{enabled:ready&&!!sim.pendingReward,glow:ready&&!!sim.pendingReward,label:sim.pendingReward?'BONUS READY':'BONUS'}

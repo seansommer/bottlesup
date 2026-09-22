@@ -22,7 +22,7 @@ test('countdown completes before simulation starts and supports an interruption 
 test('the phrase bank uses all ten phrases before repeating, without repeating at the boundary',()=>{
  const bag=new PhraseBag(seededRandom(7)),first=Array.from({length:10},()=>bag.next()),second=Array.from({length:10},()=>bag.next());assert.equal(new Set(first).size,10);assert.equal(new Set(second).size,10);assert.notEqual(first.at(-1),second[0]);assert.deepEqual([...first].sort(),[...SHIFT_PHRASES].sort());
 });
-test('Full Flow meter reaches the actual 34-bottle trigger and shows active bonus time',()=>{
+test('Bottle Blitz meter reaches the actual 34-bottle trigger and shows active bonus time',()=>{
  const s=new Simulation();for(let i=0;i<17;i++)Object.assign(s.addBottle(),{belt:'secondary',up:true,defect:null});assert.equal(flowProgress(s).fraction,.5);
  for(let i=17;i<RULES.fullFlowAt;i++)Object.assign(s.addBottle(),{belt:'secondary',up:true,defect:null});assert.equal(flowProgress(s).fraction,1);s.fullUntil=10;s.time=4;assert.equal(flowProgress(s).fraction,.6);assert.equal(flowProgress(s).active,true);
 });

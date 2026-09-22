@@ -26,10 +26,10 @@ export class ShiftCountdown {
   get done(){return this.elapsed>=this.duration;}
 }
 export function flowProgress(sim){
-  if(sim.fullFlow)return {fraction:Math.max(0,(sim.fullUntil-sim.time)/10),label:'FULL FLOW · ×3 points',detail:`Enjoy your groove · ${Math.ceil(sim.fullUntil-sim.time)}s`,active:true};
+  if(sim.fullFlow)return {fraction:Math.max(0,(sim.fullUntil-sim.time)/10),label:'BOTTLE BLITZ · ×3 points',detail:`Enjoy your groove · ${Math.ceil(sim.fullUntil-sim.time)}s`,active:true};
   const n=sim.upright, fraction=Math.min(1,n/RULES.fullFlowAt);
-  if(!sim.fullArmed)return {fraction:0,label:'Great flow! Keep the line moving.',detail:'The next bonus will recharge as bottles head into the machine.',active:false};
-  return {fraction,label:fraction>=.8?'So close — keep that rhythm!':fraction>=.5?'Looking good, crew!':fraction>0?'Nice start. Keep them standing.':'Build your Full Flow',detail:`${n} / ${RULES.fullFlowAt} good bottles standing · then ×3 points`,active:false};
+  if(!sim.fullArmed)return {fraction:0,label:'Great run! Keep the line moving.',detail:'The next bonus will recharge as bottles head into the machine.',active:false};
+  return {fraction,label:fraction>=.8?'So close — keep that rhythm!':fraction>=.5?'Looking good, crew!':fraction>0?'Nice start. Keep them standing.':'Build your Bottle Blitz',detail:`${n} / ${RULES.fullFlowAt} good bottles standing · then ×3 points`,active:false};
 }
 
 export function validCamera(value){
