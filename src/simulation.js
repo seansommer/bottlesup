@@ -8,13 +8,17 @@ export const JUICES = [
  {name:'Berry Lemon',color:'#bb344d',label:'#a3158c',short:'GUT HEALTH'}
 ];
 export function seededRandom(seed=1){let a=seed>>>0;return()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};}
+// A diminishing time bonus rewards real throughput, never throwing good bottles away.
+export function juiceSpeedBonus(seconds,handled,mode='shift'){
+ return Math.round(Math.max(0,handled)*(mode==='race'?200:40)*60/(60+Math.max(0,seconds)));
+}
 export class Simulation{
  constructor({mode='shift',seed=12345,onEvent=()=>{}}={}){
-  this.mode=mode;this.seed=seed;this.random=seededRandom(seed);this.onEvent=onEvent;this.time=0;this.level=1;this.score=0;this.waste=0;this.stood=0;this.rejected=0;this.delivered=0;this.maxCombo=0;this.combo=0;this.lastAction=-20;this.bottles=[];this.nextId=1;this.binsLoaded=0;this.binLeft=0;this.binState='empty';this.loadTime=0;this.tilt=0;this.lift=0;this.feeder=0.5;this.dumpCredit=0;this.transferCredit=0;this.stopUntil=0;this.cards=1;this.helpers=[];this.fullUntil=0;this.fullArmed=true;this.qualityUntil=0;this.rewardProgress=0;this.bestFullness=0;this.ended=false;this.paused=false;this.reason='';this.pendingReward=null;this.batchDelivered=0;this.batchReady=false;this.sixPacks=0;this.stragglers=0;this.rejectBinCount=0;this.rejectBinBad=0;this.rejectBinItems=[];
+  this.mode=['shift','endless','practice','race'].includes(mode)?mode:'shift';this.juiceStartedAt=0;this.batchRejected=0;this.speedBonusTotal=0;this.splits=[];this.seed=seed;this.random=seededRandom(seed);this.onEvent=onEvent;this.time=0;this.level=1;this.score=0;this.waste=0;this.stood=0;this.rejected=0;this.delivered=0;this.maxCombo=0;this.combo=0;this.lastAction=-20;this.bottles=[];this.nextId=1;this.binsLoaded=0;this.binLeft=0;this.binState='empty';this.loadTime=0;this.tilt=0;this.lift=0;this.feeder=0.5;this.dumpCredit=0;this.transferCredit=0;this.stopUntil=0;this.cards=1;this.helpers=[];this.fullUntil=0;this.fullArmed=true;this.qualityUntil=0;this.rewardProgress=0;this.bestFullness=0;this.ended=false;this.paused=false;this.reason='';this.pendingReward=null;this.batchDelivered=0;this.batchReady=false;this.sixPacks=0;this.stragglers=0;this.rejectBinCount=0;this.rejectBinBad=0;this.rejectBinItems=[];
  }
  get juice(){return JUICES[(this.level-1)%JUICES.length];}
- get binsRequired(){return Math.min(4,2+Math.floor((this.level-1)/3));}
- get binSize(){return 32+Math.min(12,(this.level-1)*2);}
+ get binsRequired(){if(this.mode==='race')return 2;return Math.min(4,2+Math.floor((this.level-1)/3));}
+ get binSize(){if(this.mode==='race')return 32;return 32+Math.min(12,(this.level-1)*2);}
  get secondarySpeed(){return .38+Math.min(.58,(this.level-1)*.055);}
  get secondary(){return this.bottles.filter(b=>b.belt==='secondary');}
  get upright(){return this.secondary.filter(b=>b.up&&!b.defect).length;}
@@ -30,12 +34,12 @@ export class Simulation{
  addBottle(){const r=this.random(),defect=r<.037?'label':r<.071?'cap':r<.10?'fill':null;const b={id:this.nextId++,belt:'primary',x:-4.2+(this.random()-.5)*2.2,z:-4.65,up:false,defect,rotation:this.random()*Math.PI*2,age:0,awarded:false,finicky:this.random()<.05,wobbleAt:5+this.random()*11,wobbled:false,entryOffset:(this.random()-.5)*.22};this.bottles.push(b);return b;}
  points(n){this.score=Math.max(0,Math.round(this.score+n));}
  action(id,reject=false,helper=false){if(this.ended||this.paused||this.batchReady)return false;const b=this.bottles.find(b=>b.id===id);if(!b||b.belt!=='secondary')return false;
-  if(reject){this.depositReject(b);this.bottles=this.bottles.filter(x=>x!==b);if(b.defect){this.rejected++;this.points(30*(this.fullFlow?3:1));this.rewardProgress++;this.event('reject',{id,good:true,x:b.x,z:b.z,bottle:{...b},juiceIndex:(this.level-1)%4});}else{this.points(-25);this.combo=0;this.event('reject',{id,good:false,x:b.x,z:b.z,bottle:{...b},juiceIndex:(this.level-1)%4});}return true;}
-  if(b.up)return false;b.up=true;b.rotation=0;let points=2;if(!b.awarded){b.awarded=true;this.stood++;if(!helper){this.combo=this.time-this.lastAction<2.5?this.combo+1:1;this.lastAction=this.time;this.maxCombo=Math.max(this.maxCombo,this.combo);}points=10*Math.min(4,1+Math.floor(this.combo/8));this.rewardProgress++;}points*=this.fullFlow?3:1;this.points(points);this.event('stand',{id,points,helper,x:b.x,z:b.z});return true;
+  if(reject){this.depositReject(b);this.bottles=this.bottles.filter(x=>x!==b);if(b.defect){this.rejected++;this.batchRejected++;this.points((this.mode==='race'?75:30)*(this.fullFlow?3:1));this.rewardProgress++;this.event('reject',{id,good:true,x:b.x,z:b.z,bottle:{...b},juiceIndex:(this.level-1)%4});}else{this.points(this.mode==='race'?-100:-25);this.combo=0;this.event('reject',{id,good:false,x:b.x,z:b.z,bottle:{...b},juiceIndex:(this.level-1)%4});}return true;}
+  if(b.up)return false;b.up=true;b.rotation=0;let points=2;if(!b.awarded){b.awarded=true;this.stood++;if(!helper){this.combo=this.time-this.lastAction<2.5?this.combo+1:1;this.lastAction=this.time;this.maxCombo=Math.max(this.maxCombo,this.combo);}points=10*Math.min(4,1+Math.floor(this.combo/8));this.rewardProgress++;}points*=this.fullFlow?3:1;if(this.mode==='race')points=0;this.points(points);this.event('stand',{id,points,helper,x:b.x,z:b.z});return true;
  }
- loseBottle(b,why){if(why==='defect')this.depositReject(b);this.bottles=this.bottles.filter(x=>x!==b);if(why!=='defect')this.waste++;this.combo=0;this.points(why==='defect'?-60:-35);this.event('waste',{why,id:b.id,x:b.x,z:b.z});if(this.mode!=='practice'&&this.waste>=RULES.wasteLimit)this.finish('Line overflow');}
- award(){if(this.pendingReward)return;const kinds=['stop','helper','points','card','quality'];this.pendingReward=kinds[Math.floor(this.random()*kinds.length)];this.event('mystery');}
- openReward(){const kind=this.pendingReward;if(!kind||this.ended||this.paused||this.batchReady)return null;this.pendingReward=null;if(kind==='stop')this.stopUntil=Math.max(this.time,this.stopUntil)+8;if(kind==='helper'){if(this.helpers.length<4)this.helpers.push({until:this.time+25,next:this.time+.6,index:this.helpers.length});else this.points(250);}if(kind==='points')this.points(250);if(kind==='card')this.cards=Math.min(5,this.cards+1);if(kind==='quality')this.qualityUntil=this.time+18;this.event('reward',{kind});return kind;}
+ loseBottle(b,why){if(why==='defect')this.depositReject(b);this.bottles=this.bottles.filter(x=>x!==b);if(why!=='defect')this.waste++;this.combo=0;this.points(this.mode==='race'?(why==='defect'?-150:-100):(why==='defect'?-60:-35));this.event('waste',{why,id:b.id,x:b.x,z:b.z});if(this.mode!=='practice'&&this.waste>=RULES.wasteLimit)this.finish('Line overflow');}
+ award(){if(this.pendingReward)return;const kinds=this.mode==='race'?['stop','helper','card','quality']:['stop','helper','points','card','quality'];this.pendingReward=kinds[Math.floor(this.random()*kinds.length)];this.event('mystery');}
+ openReward(){const kind=this.pendingReward;if(!kind||this.ended||this.paused||this.batchReady)return null;this.pendingReward=null;if(kind==='stop')this.stopUntil=Math.max(this.time,this.stopUntil)+8;if(kind==='helper'){if(this.helpers.length<4)this.helpers.push({until:this.time+25,next:this.time+.6,index:this.helpers.length});else if(this.mode==='race')this.cards=Math.min(5,this.cards+1);else this.points(250);}if(kind==='points')this.points(250);if(kind==='card')this.cards=Math.min(5,this.cards+1);if(kind==='quality')this.qualityUntil=this.time+18;this.event('reward',{kind});return kind;}
  step(dt){if(this.paused||this.ended||this.batchReady)return;dt=Math.min(.05,Math.max(0,dt));this.time+=dt;
   if(this.mode==='shift'&&this.time>=RULES.shiftSeconds){this.time=RULES.shiftSeconds;this.finish('Shift complete');return;}
   if(this.time-this.lastAction>2.5)this.combo=0;
@@ -71,18 +75,21 @@ export class Simulation{
   const blocked=primary.filter(b=>b.belt==='primary'&&b.z+footprint(b).extentZ>PRIMARY_BOUNDS.maxZ-.15).length>10&&this.feeder>.15;this.pressure=blocked?(this.pressure||0)+dt:Math.max(0,(this.pressure||0)-dt);if(this.pressure>2){this.pressure=0;const b=primary.find(b=>b.belt==='primary');if(b)this.loseBottle(b,'transfer overflow');if(this.ended)return;}
   this.helpers=this.helpers.filter(h=>h.until>this.time);for(const h of this.helpers){if(h.next<this.time){h.next=this.time+1.0;const b=this.secondary.filter(b=>!b.up&&!b.defect).sort((a,b)=>b.x-a.x)[0];if(b)this.action(b.id,false,true);}}
   if(this.qualityUntil>this.time){this.qaTick=(this.qaTick||0)+dt;if(this.qaTick>1){this.qaTick=0;const b=this.secondary.find(b=>b.defect);if(b)this.action(b.id,true,true);}}
-  this.bestFullness=Math.max(this.bestFullness,this.fullness);if(this.fullArmed&&this.upright>=RULES.fullFlowAt){this.fullUntil=this.time+10;this.fullArmed=false;this.points(300);this.event('fullFlow');}if(!this.fullFlow&&this.upright<22)this.fullArmed=true;
+  this.bestFullness=Math.max(this.bestFullness,this.fullness);if(this.fullArmed&&this.upright>=RULES.fullFlowAt){this.fullUntil=this.time+10;this.fullArmed=false;if(this.mode!=='race')this.points(300);this.event('fullFlow');}if(!this.fullFlow&&this.upright<22)this.fullArmed=true;
   if(this.rewardProgress>=18&&!this.pendingReward){this.rewardProgress-=18;this.award();}
-  if(this.binsLoaded>=this.binsRequired&&this.binLeft===0&&this.bottles.length===0&&!this.ended){this.batchReady=true;this.lift=0;this.event('batchComplete',{bottles:this.batchDelivered,juiceIndex:(this.level-1)%JUICES.length});}
+  if(this.binsLoaded>=this.binsRequired&&this.binLeft===0&&this.bottles.length===0&&!this.ended){this.batchReady=true;this.lift=0;
+   const seconds=this.time-this.juiceStartedAt,handled=this.batchDelivered+this.batchRejected,bonus=juiceSpeedBonus(seconds,handled,this.mode);
+   this.speedBonusTotal+=bonus;this.points(bonus);this.splits.push({juice:this.juice.name,seconds,delivered:this.batchDelivered,rejected:this.batchRejected,bonus});
+   this.event('batchComplete',{bottles:this.batchDelivered,juiceIndex:(this.level-1)%JUICES.length,seconds,bonus});}
  }
  depositReject(b){this.rejectBinCount++;if(b.defect)this.rejectBinBad++;this.rejectBinItems.push({id:b.id,defect:b.defect,juiceIndex:(this.level-1)%JUICES.length});if(this.rejectBinItems.length>14)this.rejectBinItems.shift();this.event('rejectBin',{count:this.rejectBinCount});}
  intake(bottles,partial=false){
-  const ids=new Set(bottles.map(b=>b.id)),points=bottles.length*(partial?4:8)*(this.fullFlow?3:1);
+  const ids=new Set(bottles.map(b=>b.id)),points=bottles.length*(this.mode==='race'?(partial?25:50):(partial?4:8))*(this.fullFlow?3:1);
   this.delivered+=bottles.length;this.batchDelivered+=bottles.length;if(partial)this.stragglers+=bottles.length;else this.sixPacks++;
   this.points(points);this.bottles=this.bottles.filter(b=>!ids.has(b.id));
   this.event('intake',{bottles:bottles.map(b=>({...b})),partial,points,count:bottles.length,juiceIndex:(this.level-1)%JUICES.length});
  }
- completeBatch(){if(!this.batchReady||this.ended)return false;this.batchReady=false;this.batchDelivered=0;this.level++;this.binsLoaded=0;this.binState='empty';this.tilt=0;this.lift=0;this.points(300);this.event('level',{level:this.level,juice:this.juice.name});return true;}
+ completeBatch(){if(!this.batchReady||this.ended)return false;this.batchReady=false;this.batchDelivered=0;this.batchRejected=0;if(this.mode==='race'&&this.level===4){this.finish('Four-juice finish');return true;}this.level++;this.binsLoaded=0;this.binState='empty';this.tilt=0;this.lift=0;this.juiceStartedAt=this.time;if(this.mode!=='race')this.points(300);this.event('level',{level:this.level,juice:this.juice.name});return true;}
  finish(reason){if(this.ended)return;const ready=intakeReady(this.secondary);if(ready.length)this.intake(ready,ready.length<6);this.ended=true;this.lift=0;this.reason=reason;this.event('end',{result:this.result()});}
- result(){return{version:RULES.version,mode:this.mode,seed:this.seed,score:this.score,level:this.level,stood:this.stood,rejected:this.rejected,delivered:this.delivered,waste:this.waste,maxCombo:this.maxCombo,bestFullness:Math.round(this.bestFullness*100),duration:Math.round(this.time),reason:this.reason};}
+ result(){return{version:RULES.version,mode:this.mode,seed:this.seed,score:this.score,level:this.level,stood:this.stood,rejected:this.rejected,delivered:this.delivered,waste:this.waste,maxCombo:this.maxCombo,bestFullness:Math.round(this.bestFullness*100),duration:Math.round(this.time),reason:this.reason,...(this.mode==='race'?{completedJuices:this.splits.length,speedBonus:this.speedBonusTotal}: {})};}
 }

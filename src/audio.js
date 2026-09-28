@@ -44,6 +44,7 @@ export class AudioEngine {
   else if(name==='reward-points'){notes([72,76,79,84,88],.065);}
   else if(name==='fullFlow'){notes([72,76,79,83,86,91],.1,.17);}
   else if(name==='intake'){this.noise(.2,.13,440);notes([60,67,72],.06,.1);}
+  else if(name==='sheet'){this.noise(.65,.08,600);this.tone(220,.1,.04,'triangle',.6);}
   else if(name==='wrap'){this.noise(.48,.12,1600);notes([72,76],.2,.07);}
   else if(name==='stack'){this.tone(150,.16,.14,'triangle');this.noise(.09,.11,500);this.tone(523,.2,.09,'sine',.07);}
   else if(name==='waste'){this.tone(196,.18,.085,'triangle');this.tone(165,.2,.07,'sine',.09);}

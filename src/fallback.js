@@ -47,10 +47,10 @@ export class CompatibilityScene {
   const rect=this.canvas.getBoundingClientRect(),cos=Math.cos(this.angle),sin=Math.sin(this.angle);
   c.save();c.translate(ox,oy);c.rotate(this.angle);c.scale(s,s);
   const box=(x,z,bw,bh,fill)=>{c.fillStyle=fill;c.beginPath();c.roundRect(x-bw/2,z-bh/2,bw,bh,.1);c.fill();};
-  box(-4.2,-3.2,3.1,3.9,'#889d91');box(-4.2,-3.2,2.8,3.65,'#e2e8da');box(1,0,11.5,PLANT.beltWidth+.3,'#778e83');box(1,0,11.2,PLANT.beltWidth,'#e4e8d9');
-  c.strokeStyle='#b2c0b2';c.lineWidth=.025;for(let i=0;i<51;i++){const x=-4.5+i*.22+(sim.stopped?0:(sim.time*sim.secondarySpeed)%.22);c.beginPath();c.moveTo(x,-1.45);c.lineTo(x,1.45);c.stroke();}
+  box(-4.2,-3.2,3.1,3.9,'#889d91');box(-4.2,-3.2,2.8,3.65,'#e2e8da');box(PLANT.beltX,0,PLANT.beltLength+.24,PLANT.beltWidth+.3,'#778e83');box(PLANT.beltX,0,PLANT.beltLength,PLANT.beltWidth,'#e4e8d9');
+  c.strokeStyle='#b2c0b2';c.lineWidth=.025;for(let i=0;i<Math.floor(PLANT.beltLength/.22);i++){const x=PLANT.beltMinX+i*.22+(sim.stopped?0:(sim.time*sim.secondarySpeed)%.22);c.beginPath();c.moveTo(x,-1.45);c.lineTo(x,1.45);c.stroke();}
   for(let i=0;i<16;i++){const z=-4.9+i*.22+(sim.time*sim.feeder)%.22;c.beginPath();c.moveTo(-5.5,z);c.lineTo(-2.9,z);c.stroke();}
-  box(-4.2,-6,2.7,1.8,'#a8b992');box(PLANT.machineX,0,PLANT.machineLength,3.15,'#17623e');c.fillStyle='white';c.textAlign='center';c.font='700 .3px system-ui';c.save();c.translate(PLANT.machineX,0);c.rotate(-Math.PI/2);c.fillText('LINE 01 →',0,.1);c.restore();
+  box(-4.2,-6,2.7,1.8,'#a8b992');box(PLANT.machineX,0,PLANT.machineLength,3.15,'#17623e');c.fillStyle='white';c.textAlign='center';c.font='700 .3px system-ui';c.save();c.translate(PLANT.machineX,0);c.rotate(-Math.PI/2);c.fillText('KHS →',0,.1);c.restore();
   const readySlots=new Set(intakeReady(sim.secondary).map(b=>b.gateSlot));for(let i=0;i<6;i++){c.fillStyle=readySlots.has(i)?'#75d688':'#c0d4c5';c.beginPath();c.arc(PLANT.gateX,INTAKE_SLOTS[i],.24,0,Math.PI*2);c.fill();}
   for(const b of [...sim.bottles].sort((a,b)=>(a.layer||0)-(b.layer||0))){
    let x=b.x,z=b.z;if(b.belt==='bin'){const p=fromBin(binSlot(b.slot),sim.tilt,sim.binState==='loading'?1-sim.loadTime/1.2:1);x=p.x;z=p.z;}
@@ -89,10 +89,11 @@ export class CompatibilityScene {
   c.save();c.translate(this.w/2+this.pan.x,Math.max(230,this.h*.47)+this.pan.y);c.rotate(this.angle);c.scale(s,s);
   const bottle=(x,y)=>{c.fillStyle=j.color;c.beginPath();c.roundRect(x,y,15,35,4);c.fill();c.fillStyle=j.label;c.fillRect(x,y+12,15,14);c.fillStyle='white';c.fillRect(x+3,y-3,9,6);};
   const pack=(x,y,wrapped=true)=>{for(let i=0;i<6;i++)bottle(x+(i%3)*17,y+Math.floor(i/3)*8);if(wrapped){c.fillStyle='#ffffff35';c.fillRect(x-3,y-6,57,53);c.strokeStyle='#f5fffaff';c.lineWidth=1.5;c.strokeRect(x-3,y-6,57,53);}};
-  c.fillStyle='#be935b';for(let i=0;i<5;i++)c.fillRect(-15,66+i*7,198,5);
-  for(let i=0;i<p.stacked;i++)pack(-7+i%3*62,25-Math.floor(i/6)*39+Math.floor(i/3)%2*10);
+  c.fillStyle='#1766c2';for(let i=0;i<9;i++)c.fillRect(-15,-22+i*22,198,17);
+  for(let i=0;i<p.stacked;i++){if(i>0&&i%6===0&&p.sheets>=i/6){c.fillStyle='#bf965e';c.fillRect(-12,17-Math.floor(i/6)*43,192,114);}pack(-7+i%3*62,25-Math.floor(i/6)*43+Math.floor(i/3)%2*54);}
+  if(p.phase==='sheet'){const t=p.progress,e=t*t*(3-2*t);c.fillStyle='#bf965e';c.fillRect(-12+220*(1-e),17-Math.floor(p.stacked/6)*43,192,114);}
   c.fillStyle='#78998c';c.fillRect(-182,63,120,11);c.fillRect(-170,74,8,48);c.fillRect(-80,74,8,48);
-  if(p.phase!=='done'){let x=-152,y=22;if(p.phase==='placing'){const t=p.progress;x+=t*(145+(p.stacked%3)*62);y+=(3-Math.floor(p.stacked/6)*39+Math.floor(p.stacked/3)%2*10)*t-Math.sin(t*Math.PI)*90;}pack(x,y,p.phase==='wrapped'||p.phase==='placing');if(p.phase==='wrapping'){c.strokeStyle='#fff';c.lineWidth=3;c.strokeRect(x-12*(1-p.progress)-3,y-6,57+24*(1-p.progress),53);}}
+  if(!['done','sheet'].includes(p.phase)){let x=-152,y=22;if(p.phase==='placing'){const t=p.progress;x+=t*(145+(p.stacked%3)*62);y+=(3-Math.floor(p.stacked/6)*43+Math.floor(p.stacked/3)%2*54)*t-Math.sin(t*Math.PI)*90;}pack(x,y,p.phase==='wrapped'||p.phase==='placing');if(p.phase==='wrapping'){c.strokeStyle='#fff';c.lineWidth=3;c.strokeRect(x-12*(1-p.progress)-3,y-6,57+24*(1-p.progress),53);}}
   for(let i=0;i<p.loose;i++)bottle(-177+i*20,134);
   c.fillStyle='#30543d';c.font='700 11px system-ui';c.textAlign='center';c.fillText('WRAP STATION',-122,0);c.fillText('FINISHED PALLET',85,122);if(p.loose)c.fillText(`${p.loose} LOOSE · SET ASIDE`,-122,192);c.restore();
  }

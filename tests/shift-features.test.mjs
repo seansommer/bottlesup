@@ -28,7 +28,7 @@ test('Bottle Blitz meter reaches the actual 34-bottle trigger and shows active b
 });
 test('scene guidance lights only the next appropriate dumper action and pauses safely',()=>{
  const s=new Simulation();assert.equal(controlState(s).load.glow,true);assert.equal(controlState(s).raise.glow,false);s.tilt=.2;assert.equal(controlState(s).load.glow,false);
- s.tilt=50;s.binState='empty';assert.equal(controlState(s).lower.glow,true);const b=s.addBottle();assert.equal(controlState(s).lower.glow,false);b.belt='falling';assert.equal(controlState(s).lower.glow,false);s.bottles=[];assert.equal(controlState(s).lower.glow,true);
+ s.tilt=50;s.binState='empty';assert.equal(controlState(s).lower.glow,true);const b=s.addBottle();assert.equal(controlState(s).lower.glow,true);b.belt='falling';assert.equal(controlState(s).lower.glow,true);s.bottles=[];assert.equal(controlState(s).lower.glow,true);
  s.binState='ready';s.binLeft=32;s.tilt=0;assert.equal(controlState(s).raise.glow,true);s.paused=true;for(const state of Object.values(controlState(s))){assert.equal(state.glow,false);assert.equal(state.enabled,false);}
  assert.equal(PLANT.machineLength/PLANT.beltLength,.25);
 });

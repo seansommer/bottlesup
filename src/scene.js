@@ -33,7 +33,7 @@ export class FactoryScene{
  textSign(text,w,h,bg='#0a6038',fg='#ffffff',size=64){const c=document.createElement('canvas');c.width=1024;c.height=256;const ctx=c.getContext('2d');ctx.fillStyle=bg;ctx.fillRect(0,0,1024,256);ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=fg;ctx.font=`700 ${size}px Arial`;ctx.fillText(text,512,128);const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;return new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:tex,roughness:.8}));}
  belt(w,d,x,z){const g=new THREE.Group();g.position.set(x,0,z);g.add(box(w+.24,.27,d+.2,M.steel,0,1.22,0),box(w,.075,d,M.white,0,1.39,0,.02));const slats=[];const longX=w>d;for(let p=-(longX?w:d)/2;p<(longX?w:d)/2;p+=.18){const slat=box(longX?.022:w,.018,longX?d:.022,new THREE.MeshStandardMaterial({color:0xa5b9b0,roughness:.85}),longX?p:0,1.441,longX?0:p,0);g.add(slat);slats.push(slat);}
   for(const sx of [-1,1])for(const sz of [-1,1])g.add(box(.11,1.2,.11,M.steel,sx*(w/2-.25),.6,sz*(d/2-.17)));
-  if(longX){for(const s of [-1,1]){g.add(box(w,.08,.09,M.steel,0,1.67,s*(d/2+.02)));for(let p=-w/2+.2;p<w/2;p+=1.2)g.add(box(.06,.36,.07,M.steel,p,1.54,s*(d/2+.02)));}}
+  if(longX){for(const s of [-1,1]){if(s===-1&&Math.abs(w-PLANT.beltLength)<.001){const start=-2.75-x,end=w/2;g.add(box(end-start,.08,.09,M.steel,(start+end)/2,1.67,s*(d/2+.02)));}else g.add(box(w,.08,.09,M.steel,0,1.67,s*(d/2+.02)));for(let p=-w/2+.2;p<w/2;p+=1.2)if(!(s===-1&&Math.abs(w-PLANT.beltLength)<.001&&p+x<-2.75))g.add(box(.06,.36,.07,M.steel,p,1.54,s*(d/2+.02)));}}
   else{for(const s of [-1,1])g.add(box(.1,.42,d,M.steel,s*(w/2+.02),1.58,0));}
   this.scene.add(g);return {g,slats,longX,w,d,phase:0};
  }
@@ -51,7 +51,7 @@ export class FactoryScene{
   for(let i=0;i<6;i++){const spare=crate();spare.position.set(-14+(i%2)*3,0,3+Math.floor(i/2)*3);this.scene.add(spare);}
   for(let x=-12;x<17;x+=3)this.scene.add(box(.025,7.5,.03,M.steel,x,3.75,-10.84,0));
   const wordmark=this.textSign('suja',5,1.25,'#086139','#ffffff',178);wordmark.position.set(4.7,4.1,-10.8);this.scene.add(wordmark);const sign=this.textSign('BOTTLING HALL  /  01',4,.65,'#e1eae3','#246044',42);sign.position.set(4.7,3.06,-10.77);this.scene.add(sign);
-  this.primary=this.belt(2.9,3.6,-4.2,-3.32);this.secondary=this.belt(PLANT.beltLength,PLANT.beltWidth,1,0);
+  this.primary=this.belt(2.9,3.6,-4.2,-3.32);this.secondary=this.belt(PLANT.beltLength,PLANT.beltWidth,PLANT.beltX,0);
   // Feed motor, fixed-speed machine and overhead pipework.
   this.scene.add(cyl(.29,.29,.55,M.green,-5.86,1.13,-2));
   const length=PLANT.machineLength,mx=PLANT.machineX;
@@ -59,7 +59,7 @@ export class FactoryScene{
   const glass=new THREE.MeshPhysicalMaterial({color:0x75cda4,transparent:true,opacity:.24,roughness:.16,metalness:.15});
   for(const z of [-1.5,1.5]){this.scene.add(box(length,.62,.13,M.steel,mx,.88,z),box(length-.3,.8,.05,glass,mx,1.62,z));for(const x of [mx-length/2+.07,mx+length/2-.07])this.scene.add(box(.15,1.5,.15,M.steel,x,1.53,z));}
   this.scene.add(box(length,.07,2.95,M.white,mx,1.39,0));
-  const exit=this.textSign('SIX-PACK LINE 01',length-.2,.34);exit.position.set(mx,2.4,1.59);this.scene.add(exit);
+  const exit=this.textSign('KHS',length-.2,.34);exit.position.set(mx,2.4,1.59);this.scene.add(exit);
   const tower=cyl(.065,.065,.7,M.dark,mx+.75,2.92,0);this.scene.add(tower);this.light=sphere(.15,new THREE.MeshStandardMaterial({color:0x39e884,emissive:0x10b151,emissiveIntensity:1.5}),mx+.75,3.38,0);this.scene.add(this.light);
   for(let x=-8;x<=10;x+=6){this.scene.add(box(.11,5.5,.11,M.steel,x,2.75,-9.5));const pipe=cyl(.065,.065,17,M.steel,0,5.43,-9.5);pipe.rotation.z=Math.PI/2;this.scene.add(pipe);const glow=box(3,.075,.5,new THREE.MeshStandardMaterial({color:0xffffff,emissive:0xffffff,emissiveIntensity:2}),x,6.3,-4);this.scene.add(glow);}
   for(let i=0;i<3;i++){const stack=crate();stack.position.set(-9.1,0,-7+i*2.4);this.scene.add(stack);const upper=crate();upper.position.set(-9.1,1.85,-7+i*2.4);this.scene.add(upper);}

@@ -2,7 +2,7 @@ import {PLANT} from './control-state.js';
 
 export const BODY_RADIUS=.235;
 export const PRIMARY_BOUNDS={minX:-5.65,maxX:-2.75,minZ:-5.12,maxZ:-1.52};
-export const SECONDARY_BOUNDS={minX:-4.625,maxX:PLANT.gateX+BODY_RADIUS,minZ:-PLANT.beltWidth/2,maxZ:PLANT.beltWidth/2};
+export const SECONDARY_BOUNDS={minX:PLANT.beltMinX,maxX:PLANT.gateX+BODY_RADIUS,minZ:-PLANT.beltWidth/2,maxZ:PLANT.beltWidth/2};
 export const INTAKE_SLOTS=Object.freeze([ -1.2,-.72,-.24,.24,.72,1.2 ]);
 export function footprint(b){
  const half=b.up?0:b.defect==='cap'?.42:.33,a=b.rotation||0,dx=Math.cos(a)*half,dz=Math.sin(a)*half;

@@ -16,7 +16,7 @@ test('the machine waits for six, then awards and removes exactly one complete ro
 });
 test('one through five final stragglers earn half intake points, including shift cutoff',()=>{
  for(let n=1;n<6;n++){
-  const s=new Simulation();s.binsLoaded=s.binsRequired;row(s,n);s.step(1/60);assert.equal(s.score,n*4);assert.equal(s.stragglers,n);assert.equal(s.sixPacks,0);assert.equal(s.batchReady,true);assert.equal(s.batchDelivered,n);
+  const s=new Simulation();s.binsLoaded=s.binsRequired;row(s,n);s.step(1/60);assert.equal(s.score,n*4+s.speedBonusTotal);assert.equal(s.stragglers,n);assert.equal(s.sixPacks,0);assert.equal(s.batchReady,true);assert.equal(s.batchDelivered,n);
   const cutoff=new Simulation();row(cutoff,n);cutoff.time=179.999;cutoff.step(1/60);assert.equal(cutoff.score,n*4);assert.equal(cutoff.ended,true);assert.equal(cutoff.delivered,n);
  }
 });
@@ -45,7 +45,7 @@ test('mixed defects and lying bottles clear the intake behind a partial good row
   const s=new Simulation({mode:'practice'});s.binsLoaded=s.binsRequired;s.score=500;
   row(s,4);make(s,{x:4,z:1.1,defect,up,rotation:1.3});make(s,{x:2,z:-.35});make(s,{x:1,z:.6});
   for(let i=0;i<40*60;i++){s.step(1/60);for(const b of s.secondary)assert.ok(fits(b,s.secondary,SECONDARY_BOUNDS),`overlap with ${defect}, upright=${up}`);}
-  assert.equal(s.secondary.length,0);assert.equal(s.delivered,6);assert.equal(s.rejectBinBad,1);assert.equal(s.waste,0);assert.equal(s.batchReady,true);assert.equal(s.score,488);
+  assert.equal(s.secondary.length,0);assert.equal(s.delivered,6);assert.equal(s.rejectBinBad,1);assert.equal(s.waste,0);assert.equal(s.batchReady,true);assert.equal(s.score,488+s.speedBonusTotal);
  }
 });
 test('a defect is penalized only at the machine, and a stop freezes intake rollers',()=>{

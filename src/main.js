@@ -26,6 +26,7 @@ let reduced=localStorage.getItem('sujaReducedFx')==='true'||matchMedia('(prefers
 const query=new URLSearchParams(location.search),challengeCode=(query.get('challenge')||'').toUpperCase();
 const canOperate=()=>playing&&!shiftPaused&&!countdown&&!packing&&!sim.ended&&!sim.batchReady;
 
+function formatTime(seconds){const n=Math.max(0,Math.round(seconds));return `${Math.floor(n/60)}:${String(n%60).padStart(2,'0')}`;}
 function notice(text){clearTimeout(eventTimer);$('event').textContent=text;$('event').hidden=false;eventTimer=setTimeout(()=>$('event').hidden=true,3200);}
 function float(text,x,y){if(reduced)return;const n=document.createElement('span');n.className='float-score';n.textContent=text;n.style.left=x+'px';n.style.top=y+'px';$('floating').append(n);setTimeout(()=>n.remove(),850);}
 function handleEvent(e){
@@ -38,9 +39,9 @@ function handleEvent(e){
   const labels={stop:'Line stopped · 8 seconds',helper:'Extra hands · 25 seconds',points:'+250 bonus points',card:'One stop card added',quality:'Quality sweep · 18 seconds'};
   notice(labels[e.kind]);
  }
- if(e.type==='waste')notice(e.why==='defect'?'Bad bottle reached the machine · −60':'Bottle lost · −35');
+ if(e.type==='waste')notice(e.why==='defect'?`Missed defect · −${mode==='race'?150:60}`:`Bottle lost · −${mode==='race'?100:35}`);
  if(e.type==='fullFlow')notice('BOTTLE BLITZ! Triple points for 10 seconds');
- if(e.type==='level')notice(`Juice ${e.level}: ${e.juice} · +300`);
+ if(e.type==='level')notice(`Juice ${e.level}: ${e.juice}${mode==='race'?'':' · +300'}`);
 
  if(e.type==='reject')scene.reject(e);
  if(e.type==='stand'&&!reduced)scene.burst(e.x,e.z);
@@ -48,7 +49,7 @@ function handleEvent(e){
   scene.intake(e);if(!e.partial)notice(`SIX-PACK! +${e.points}`);
   $('intake-status').textContent=e.partial?`${e.count} straggler${e.count===1?'':'s'} · +${e.points} (half intake points)`:`Six-pack in! +${e.points}`;
  }
- if(e.type==='batchComplete')beginPacking(e.bottles,e.juiceIndex);
+ if(e.type==='batchComplete'){beginPacking(e.bottles,e.juiceIndex);$('packing-bonus').textContent=`${formatTime(e.seconds)} on the line · +${e.bonus.toLocaleString()} speed bonus`;audio.play('level');}
  if(e.type==='end')endRun(e.result);
 }
 
@@ -106,7 +107,7 @@ function operate(id,phase='tap'){
 function pick(id,right,x,y,candidates=[id]){
  if(!canOperate())return;
  if(right||rejectMode){sim.setLift(0);inspectionIds=candidates;selectBottle(id);return;}
- const before=sim.score;if(sim.action(id))float((sim.score>=before?'+':'')+(sim.score-before),x,y);
+ const before=sim.score;if(sim.action(id)&&sim.score!==before)float((sim.score>=before?'+':'')+(sim.score-before),x,y);
 }
 function selectBottle(id){
  const b=sim.secondary.find(b=>b.id===id);if(!b)return;
@@ -127,18 +128,18 @@ function confirmInspection(reject){
 function beginPacking(bottles,juiceIndex,final=false){
  saveCamera();packing=new Palletizer(bottles,juiceIndex);packingFinal=final;shiftPaused=false;packingPhase=null;
  sim.setLift(0);closeInspection();scene.setPacking(packing);$('packing').hidden=false;$('bonus-status').hidden=true;
- $('packing-juice').textContent=sim.juice.name;updatePacking();updateVisibility();
+ $('packing-bonus').textContent='';$('packing-juice').textContent=sim.juice.name;updatePacking();updateVisibility();
  notice(final?'Finish your pallet. Your shift score is complete.':'Juice run complete — time to pack. The clock is paused.');
 }
 function updatePacking(){
  const p=packing;if(!p)return;
- if(p.phase!==packingPhase){if(p.phase==='wrapping')audio.play('wrap');if(packingPhase==='placing')audio.play('stack');packingPhase=p.phase;}
+ if(p.phase!==packingPhase){if(p.phase==='wrapping')audio.play('wrap');if(p.phase==='sheet')audio.play('sheet');if(packingPhase==='placing')audio.play('stack');packingPhase=p.phase;}
  $('packing-count').textContent=`${p.bottles} good bottle${p.bottles===1?'':'s'} · ${p.total} six-pack${p.total===1?'':'s'}`;
  $('packing-loose').textContent=p.loose?`${p.loose} loose bottle${p.loose===1?'':'s'} set aside — only full six-packs go on the pallet.`:'Every accepted bottle fits a full six-pack.';
  $('packing-stacked').textContent=`${p.stacked} / ${p.total} stacked`;
- const labels={ready:'Wrap the next six bottles.',wrapping:'Shrink-wrapping…',wrapped:'Six-pack ready. Place it on the pallet.',placing:'Stacking your six-pack…',done:p.total?'Pallet ready. Nice work, crew.':'No full six-pack this time. Your loose bottles are set aside.'};
+ const labels={ready:'Wrap the next six bottles.',wrapping:'Shrink-wrapping…',wrapped:'Six-pack ready. Place it on the pallet.',placing:'Stacking your six-pack…',sheet:'Sliding cardboard between the layers…',done:p.total?'Pallet ready. Nice work, crew.':'No full six-pack this time. Your loose bottles are set aside.'};
  $('packing-status').textContent=labels[p.phase];$('wrap-pack').disabled=p.phase!=='ready'||p.auto;$('place-pack').disabled=p.phase!=='wrapped'||p.auto;$('auto-pack').disabled=p.phase==='done'||p.auto;
- $('packing-actions').hidden=p.phase==='done';$('packing-next').hidden=p.phase!=='done';$('packing-next').textContent=packingFinal?'View shift results →':'Start the next juice →';
+ $('packing-actions').hidden=p.phase==='done';$('packing-next').hidden=p.phase!=='done';$('packing-next').textContent=packingFinal||mode==='race'&&sim.level===4?'View results →':'Start the next juice →';
 }
 function finishPacking(){
  if(packing?.phase!=='done')return;
@@ -202,7 +203,7 @@ function updateHud(){
  $('combo').textContent=sim.combo>=2?`${sim.combo} COMBO ×${Math.min(4,1+Math.floor(sim.combo/8))}`:'';
  const seconds=mode==='shift'?Math.ceil(RULES.shiftSeconds-sim.time):Math.floor(sim.time);
  $('timer').textContent=mode==='practice'?'PRACTICE':`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
- $('juice').textContent=sim.juice.name;$('level').textContent=`JUICE ${String(sim.level).padStart(2,'0')}`;
+ $('juice').textContent=(mode==='race'?`${sim.level}/4 · `:'')+sim.juice.name;$('level').textContent=`JUICE ${String(sim.level).padStart(2,'0')}`;
  $('waste').textContent=mode==='practice'?`${sim.waste} lost`:`${sim.waste} / ${RULES.wasteLimit} lost`;
  const flow=flowProgress(sim);$('flow-fill').style.width=flow.fraction*100+'%';$('flow-label').textContent=flow.active?'BLITZ ×3':'BOTTLE BLITZ';$('flow-target').textContent=flow.detail;
  $('flow-meter').setAttribute('aria-valuenow',String(Math.round(flow.fraction*100)));$('flow-meter').setAttribute('aria-valuetext',flow.label+'. '+flow.detail);
@@ -240,7 +241,7 @@ async function start(){
  if(!scene)return;
  if(challengeCode&&(!challenge||challenge.status!=='open')){notice('This challenge is not open yet. Return to Game Center.');return;}
  saveCamera();await audio.unlock();audio.active=true;
- mode=challengeCode?'shift':mode;
+ mode=challengeCode?(challenge?.mode||'shift'):mode;
  const seed=challenge?challenge.seed:Number(new Date().toISOString().slice(0,10).replaceAll('-',''));
  scene.setPacking(null);packing=null;
  sim=new Simulation({mode,seed,onEvent:handleEvent});playing=true;shiftPaused=false;accumulator=0;
@@ -280,8 +281,11 @@ function menu(){
 }
 function endRun(result){
  saveCamera();audio.active=false;pendingResult=result;sim.paused=true;
+ $('result-splits').replaceChildren();
+ if(mode==='race'||sim.splits.length){const title=document.createElement('h3');title.textContent=mode==='race'?`FOUR-JUICE RACE · ${formatTime(sim.time)}`:'JUICE RUN BONUSES';$('result-splits').append(title);for(const split of sim.splits){const row=document.createElement('p');row.textContent=`${split.juice} · ${formatTime(split.seconds)} · +${split.bonus.toLocaleString()} speed`; $('result-splits').append(row);}const total=document.createElement('p');total.textContent=`Bottle points & penalties: ${(sim.score-sim.speedBonusTotal).toLocaleString()} · Speed bonuses: +${sim.speedBonusTotal.toLocaleString()}`;$('result-splits').append(total);}
+ $('result-points-label').textContent=mode==='race'?'RACE POINTS':'SHIFT POINTS';$('again').textContent=mode==='race'?'Race again →':'One more shift →';
  $('result-reason').textContent=result.reason.toUpperCase();$('result-score').textContent=result.score.toLocaleString();$('result-grid').replaceChildren();
- for(const [label,value]of [['Stood up',result.stood],['Six-packs',sim.sixPacks],['Stragglers · ½ points',sim.stragglers],['Defects caught',result.rejected],['Best combo',result.maxCombo],['Juice level',result.level]]){
+ for(const [label,value]of [[mode==='race'?'Good bottles saved':'Stood up',mode==='race'?result.delivered:result.stood],['Six-packs',sim.sixPacks],['Stragglers · ½ points',sim.stragglers],['Defects caught',result.rejected],['Best combo',result.maxCombo],['Juice level',result.level]]){
   const n=document.createElement('div'),b=document.createElement('b'),s=document.createElement('span');b.textContent=value;s.textContent=label;n.append(b,s);$('result-grid').append(n);
  }
  loadLeaderboard();saveResult();
@@ -290,18 +294,19 @@ function endRun(result){
 }
 async function saveResult(){
  if(!pendingResult)return;$('retry-save').hidden=true;
+ if(mode==='race'&&pendingResult.reason!=='Four-juice finish'){$('save-status').textContent='Finish all four juices to qualify for the race board.';return;}
  if(mode==='practice'){$('save-status').textContent='Practice complete. Practice scores are not ranked.';return;}
  if(!runOwner){$('save-status').textContent='Guest run. Sign in before your next shift to save your score.';return;}
  if(community.profile?.profileId!==runOwner){$('save-status').textContent='Your player changed. This run cannot be saved to a different account.';return;}
  $('save-status').textContent='Saving your shift…';
  try{const savedRun=runId;await community.saveRun(savedRun,pendingResult,challengeCode);if(savedRun!==runId||!pendingResult)return;$('save-status').textContent='Shift saved to your player card and Hall of Fame.';loadLeaderboard();}
- catch(e){$('save-status').textContent=friendlyError(e);$('retry-save').hidden=false;}
+ catch(e){$('save-status').textContent=mode==='race'&&/permission.?denied/i.test(String(e))?'Race score saving needs the latest Firebase rules. Sean can publish the updated rules, then retry here.':friendlyError(e);$('retry-save').hidden=false;}
 }
 
 async function loadLeaderboard(){
  const request=++boardRequest,owner=community.profile?.profileId,currentRun=runId;
- const category=mode==='endless'?'endless':'shift';
- $('leaderboard-mode').textContent=category==='endless'?'Endless · all-time scores':'3-minute shift · all-time scores';
+ const category=mode==='race'?'race':mode==='endless'?'endless':'shift';
+ $('leaderboard-mode').textContent=category==='race'?'Four-juice race · total points · completed races':category==='endless'?'Endless · all-time scores':'3-minute shift · all-time scores';
  $('top-scores').replaceChildren();$('retry-board').hidden=true;
  if(!owner){$('leaderboard-status').textContent='Sign in at Game Center to see the crew’s all-time scores.';return;}
  $('leaderboard-status').textContent='Loading the best shifts…';
@@ -312,7 +317,7 @@ async function loadLeaderboard(){
   $('leaderboard-status').textContent=scores.length?'':'The board is ready for its first score.';
   for(const [index,r] of scores.entries()){
    const row=document.createElement('li'),rank=document.createElement('span'),name=document.createElement('span'),score=document.createElement('b');
-   rank.textContent=String(index+1).padStart(2,'0');name.textContent=r.displayName;score.textContent=r.score.toLocaleString();
+   rank.textContent=String(index+1).padStart(2,'0');name.textContent=r.displayName+(category==='race'?` · ${formatTime(r.duration)}`:'');score.textContent=r.score.toLocaleString();
    if(r.id===currentRun&&r.playerId===runOwner){row.className='your-run';name.textContent+=' · this shift';}
    row.append(rank,name,score);$('top-scores').append(row);
   }
@@ -354,7 +359,7 @@ for(const b of document.querySelectorAll('[data-camera]'))b.addEventListener('cl
 $('inspect-close').addEventListener('click',closeInspection);$('inspect-prev').addEventListener('click',()=>cycleInspection(-1));$('inspect-next').addEventListener('click',()=>cycleInspection(1));$('inspect-focus').addEventListener('click',()=>scene.focus(selectionId));$('inspect-reject').addEventListener('click',()=>confirmInspection(true));$('inspect-keep').addEventListener('click',()=>confirmInspection(false));
 $('wrap-pack').addEventListener('click',()=>packing?.wrap());$('place-pack').addEventListener('click',()=>packing?.place());$('auto-pack').addEventListener('click',()=>{if(packing)packing.auto=true;});$('packing-next').addEventListener('click',finishPacking);
 $('view').addEventListener('click',toggleView);
-for(const b of document.querySelectorAll('[data-mode]'))b.addEventListener('click',()=>{mode=b.dataset.mode;for(const x of document.querySelectorAll('[data-mode]'))x.classList.toggle('selected',x===b);});
+for(const b of document.querySelectorAll('[data-mode]'))b.addEventListener('click',()=>{mode=b.dataset.mode;$('race-note').hidden=mode!=='race';for(const x of document.querySelectorAll('[data-mode]'))x.classList.toggle('selected',x===b);});
 for(const b of document.querySelectorAll('[data-close]'))b.addEventListener('click',()=>$(b.dataset.close).close());
 $('how').addEventListener('click',()=>$('help-dialog').showModal());
 for(const b of document.querySelectorAll('[data-tutorial]'))b.addEventListener('click',()=>{if(playing&&!shiftPaused)pause();audio.unlock();tutorial.open();});
