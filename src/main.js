@@ -1,3 +1,4 @@
+import {topRuns} from './leaderboard.js';
 import {Palletizer} from './palletizer.js';
 import {CompatibilityScene} from './fallback.js';
 import {Simulation,RULES} from './simulation.js';
@@ -20,6 +21,7 @@ let mode='shift',playing=false,rejectMode=false,scene,sim,last=0,accumulator=0,e
 let runId,runOwner=null,pendingResult=null,challenge=null;
 let packing=null,packingFinal=false,packingPhase=null,selectionId=null,inspectionIds=[];
 let countdown=null,countdownLabel='',shiftPaused=false,dashboard=false,viewOwner=null,cameraSaveTimer;
+let controlMenu=false,controlCategory=null,boardRequest=0;
 let reduced=localStorage.getItem('sujaReducedFx')==='true'||matchMedia('(prefers-reduced-motion: reduce)').matches;
 const query=new URLSearchParams(location.search),challengeCode=(query.get('challenge')||'').toUpperCase();
 const canOperate=()=>playing&&!shiftPaused&&!countdown&&!packing&&!sim.ended&&!sim.batchReady;
@@ -29,8 +31,8 @@ function float(text,x,y){if(reduced)return;const n=document.createElement('span'
 function handleEvent(e){
  if(!playing)return;
  audio.play(e.type==='reward'?`reward-${e.kind}`:e.type);
- if(e.type==='loaded')notice('Bin ready. Hold the glowing ↑ to begin tipping.');
- if(e.type==='binEmpty')notice(sim.binsLoaded<sim.binsRequired?'Bin empty. The ↓ will glow when the feeder is clear.':'Last bin! Clear the line for the next juice.');
+ if(e.type==='loaded')notice('Bin ready!');
+ if(e.type==='binEmpty')notice('Bin cleared!');
  if(e.type==='mystery')notice('A little help? Your rainbow ? bonus is ready.');
  if(e.type==='reward'){
   const labels={stop:'Line stopped · 8 seconds',helper:'Extra hands · 25 seconds',points:'+250 bonus points',card:'One stop card added',quality:'Quality sweep · 18 seconds'};
@@ -39,17 +41,18 @@ function handleEvent(e){
  if(e.type==='waste')notice(e.why==='defect'?'Bad bottle reached the machine · −60':'Bottle lost · −35');
  if(e.type==='fullFlow')notice('BOTTLE BLITZ! Triple points for 10 seconds');
  if(e.type==='level')notice(`Juice ${e.level}: ${e.juice} · +300`);
- if(e.type==='wobble')notice('Bottle down! Check downstream.');
+
+ if(e.type==='reject')scene.reject(e);
  if(e.type==='stand'&&!reduced)scene.burst(e.x,e.z);
  if(e.type==='intake'){
-  scene.intake(e);
+  scene.intake(e);if(!e.partial)notice(`SIX-PACK! +${e.points}`);
   $('intake-status').textContent=e.partial?`${e.count} straggler${e.count===1?'':'s'} · +${e.points} (half intake points)`:`Six-pack in! +${e.points}`;
  }
  if(e.type==='batchComplete')beginPacking(e.bottles,e.juiceIndex);
  if(e.type==='end')endRun(e.result);
 }
 
-function syncViewLabel(){$('view').textContent=scene.kind==='2d'?'Overhead':scene.view==='first'?'Overhead':'First person';}
+function syncViewLabel(){for(const b of document.querySelectorAll('[data-preset]')){b.classList.toggle('selected',b.dataset.preset===scene.view);b.setAttribute('aria-pressed',String(b.dataset.preset===scene.view));}}
 function saveCamera(){clearTimeout(cameraSaveTimer);if(scene&&!packing)preferences.write(viewOwner,{camera:scene.getCamera()});}
 function queueCameraSave(){
  if(packing)return;
@@ -68,6 +71,11 @@ function updateVisibility(){
  const inShift=playing&&!packing&&!sim?.ended;
  const toolsVisible=inShift&&!countdown&&selectionId===null;
  $('controls').hidden=!toolsVisible||!dashboard;
+ $('control-toggle').hidden=!toolsVisible;
+ $('radial-panel').hidden=!toolsVisible||!controlMenu;
+ $('control-toggle').setAttribute('aria-expanded',String(controlMenu&&toolsVisible));
+ $('control-toggle').setAttribute('aria-label',controlMenu?'Close control panel':'Open control panel');
+ for(const b of document.querySelectorAll('[data-category]')){const open=controlCategory===b.dataset.category;b.setAttribute('aria-expanded',String(open));$(b.dataset.category+'-tools').hidden=!open;}
  $('dash-toggle').hidden=!toolsVisible;
  $('quick-inspect').hidden=!toolsVisible||dashboard;
  $('hint').hidden=!toolsVisible||dashboard;
@@ -82,7 +90,7 @@ function updateVisibility(){
  $('countdown').hidden=!countdown;
  scene?.setInteraction(canOperate()&&selectionId===null,{reduced,inspect:rejectMode});
 }
-function toggleDashboard(){dashboard=!dashboard;preferences.write(viewOwner,{dashboard});updateVisibility();}
+function toggleDashboard(){sim?.setLift(0);controlMenu=false;dashboard=!dashboard;preferences.write(viewOwner,{dashboard});updateVisibility();}
 function setFeeder(value){if(!canOperate())return;sim.setFeeder(Math.max(0,Math.min(1,value)));audio.play('feeder');}
 function operate(id,phase='tap'){
  if(phase==='end'){if(id==='raise'||id==='lower')sim?.setLift(0);return;}
@@ -114,7 +122,7 @@ function confirmInspection(reject){
  const id=selectionId,b=sim.secondary.find(b=>b.id===id);if(!b){closeInspection();notice('That bottle has moved off the line.');return;}
  const before=sim.score,position=scene.project(id);
  if(sim.action(id,reject)&&position)float((sim.score>=before?'+':'')+(sim.score-before),position.x,position.y);
- closeInspection();
+ closeInspection();if(reject)setReject(false);
 }
 function beginPacking(bottles,juiceIndex,final=false){
  saveCamera();packing=new Palletizer(bottles,juiceIndex);packingFinal=final;shiftPaused=false;packingPhase=null;
@@ -148,7 +156,7 @@ try{scene=new FactoryScene($('world'),pick,operate);}
 catch(e){
  console.warn('3D unavailable; using compatibility view.',e.message);
  const old=$('world'),replacement=old.cloneNode(false);old.replaceWith(replacement);scene=new CompatibilityScene(replacement,pick,operate);
- $('view').disabled=true;document.body.classList.add('compatibility');
+document.body.classList.add('compatibility');
  $('camera-help').textContent='Drag to move · Pinch or scroll to zoom · Use the buttons to rotate the overhead view.';
  for(const b of document.querySelectorAll('[data-camera^="tilt"]'))b.hidden=true;
 }
@@ -191,15 +199,23 @@ function frame(now){
 }
 function updateHud(){
  $('score').textContent=sim.score.toLocaleString();
- $('combo').textContent=sim.combo>=2?`${sim.combo} in a row · ×${Math.min(4,1+Math.floor(sim.combo/8))}`:'Build your streak';
+ $('combo').textContent=sim.combo>=2?`${sim.combo} COMBO ×${Math.min(4,1+Math.floor(sim.combo/8))}`:'';
  const seconds=mode==='shift'?Math.ceil(RULES.shiftSeconds-sim.time):Math.floor(sim.time);
  $('timer').textContent=mode==='practice'?'PRACTICE':`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
  $('juice').textContent=sim.juice.name;$('level').textContent=`JUICE ${String(sim.level).padStart(2,'0')}`;
  $('waste').textContent=mode==='practice'?`${sim.waste} lost`:`${sim.waste} / ${RULES.wasteLimit} lost`;
- const flow=flowProgress(sim);$('flow-fill').style.width=flow.fraction*100+'%';$('flow-label').textContent=flow.label;$('flow-target').textContent=flow.detail;
+ const flow=flowProgress(sim);$('flow-fill').style.width=flow.fraction*100+'%';$('flow-label').textContent=flow.active?'BLITZ ×3':'BOTTLE BLITZ';$('flow-target').textContent=flow.detail;
  $('flow-meter').setAttribute('aria-valuenow',String(Math.round(flow.fraction*100)));$('flow-meter').setAttribute('aria-valuetext',flow.label+'. '+flow.detail);
  document.body.classList.toggle('full-flow',flow.active);
  const controls=controlState(sim,canOperate());
+ for(const b of document.querySelectorAll('[data-operation],[data-hold]')){const state=controls[b.dataset.operation||b.dataset.hold];b.disabled=!state.enabled;b.classList.toggle('suggested',state.glow);}
+ const dumperGlow=['load','raise','lower'].some(id=>controls[id].glow);
+ document.querySelector('[data-category="dumper"]').classList.toggle('suggested',dumperGlow);
+ document.querySelector('[data-category="conveyor"]').classList.toggle('suggested',controls.slower.glow||controls.faster.glow||controls.stop.glow);
+ $('control-toggle').classList.toggle('suggested',dumperGlow||!!sim.pendingReward);
+ $('radial-bonus').disabled=!controls.bonus.enabled;$('radial-bonus').classList.toggle('suggested',!!sim.pendingReward);
+ $('radial-bin').textContent=`${sim.binLeft} bottles · ${Math.round(sim.tilt)}°`;
+ $('radial-speed').textContent=`Feeder ${Math.round(sim.feeder*100)}% · ${sim.cards} stop card${sim.cards===1?'':'s'}`;
  for(const [id,state]of [['load','load'],['raise','raise'],['lower','lower'],['stop-belt','stop']]){$(id).disabled=!controls[state].enabled;$(id).classList.toggle('suggested',controls[state].glow);}
  $('tilt-label').textContent=`Tilt ${Math.round(sim.tilt)}°`;$('bin-left').textContent=sim.binState==='loading'?'Loading…':sim.binLeft?`${sim.binLeft} bottles left`:'Bin empty';$('bin-counter').textContent=`BIN ${sim.binsLoaded} / ${sim.binsRequired}`;
  $('speed').value=Math.round(sim.feeder*100);$('speed-value').textContent=`${Math.round(sim.feeder*100)}%`;
@@ -229,7 +245,7 @@ async function start(){
  scene.setPacking(null);packing=null;
  sim=new Simulation({mode,seed,onEvent:handleEvent});playing=true;shiftPaused=false;accumulator=0;
  runId=crypto.randomUUID?.()||Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,'0')).join('');
- runOwner=community.profile?.profileId||null;pendingResult=null;
+ runOwner=community.profile?.profileId||null;pendingResult=null;boardRequest++;controlMenu=false;controlCategory=null;
  restorePreferences(runOwner);$('packing').hidden=true;closeInspection();
  $('camera-panel').hidden=true;$('camera-toggle').setAttribute('aria-expanded','false');setReject(false);
  $('intake-status').textContent='Six good bottles. One satisfying pack.';
@@ -256,7 +272,7 @@ function resume(){
  shiftPaused=false;sim.paused=sim.ended||!!countdown;audio.active=true;$('pause-dialog').close();audio.unlock();updateVisibility();
 }
 function menu(){
- saveCamera();scene.setPacking(null);packing=null;countdown=null;playing=false;shiftPaused=false;audio.active=false;
+ saveCamera();scene.setPacking(null);packing=null;countdown=null;playing=false;boardRequest++;pendingResult=null;controlMenu=false;shiftPaused=false;audio.active=false;
  $('packing').hidden=true;closeInspection();$('camera-panel').hidden=true;$('camera-toggle').setAttribute('aria-expanded','false');
  for(const d of document.querySelectorAll('dialog'))d.close();
  for(const id of ['hud','pause','event','bonus-status'])$(id).hidden=true;
@@ -268,7 +284,7 @@ function endRun(result){
  for(const [label,value]of [['Stood up',result.stood],['Six-packs',sim.sixPacks],['Stragglers · ½ points',sim.stragglers],['Defects caught',result.rejected],['Best combo',result.maxCombo],['Juice level',result.level]]){
   const n=document.createElement('div'),b=document.createElement('b'),s=document.createElement('span');b.textContent=value;s.textContent=label;n.append(b,s);$('result-grid').append(n);
  }
- saveResult();
+ loadLeaderboard();saveResult();
  if(sim.batchDelivered>0)beginPacking(sim.batchDelivered,(sim.level-1)%4,true);else{closeInspection();$('results-dialog').showModal();}
  updateVisibility();
 }
@@ -278,10 +294,44 @@ async function saveResult(){
  if(!runOwner){$('save-status').textContent='Guest run. Sign in before your next shift to save your score.';return;}
  if(community.profile?.profileId!==runOwner){$('save-status').textContent='Your player changed. This run cannot be saved to a different account.';return;}
  $('save-status').textContent='Saving your shift…';
- try{await community.saveRun(runId,pendingResult,challengeCode);$('save-status').textContent='Shift saved to your player card and Hall of Fame.';}
+ try{const savedRun=runId;await community.saveRun(savedRun,pendingResult,challengeCode);if(savedRun!==runId||!pendingResult)return;$('save-status').textContent='Shift saved to your player card and Hall of Fame.';loadLeaderboard();}
  catch(e){$('save-status').textContent=friendlyError(e);$('retry-save').hidden=false;}
 }
 
+async function loadLeaderboard(){
+ const request=++boardRequest,owner=community.profile?.profileId,currentRun=runId;
+ const category=mode==='endless'?'endless':'shift';
+ $('leaderboard-mode').textContent=category==='endless'?'Endless · all-time scores':'3-minute shift · all-time scores';
+ $('top-scores').replaceChildren();$('retry-board').hidden=true;
+ if(!owner){$('leaderboard-status').textContent='Sign in at Game Center to see the crew’s all-time scores.';return;}
+ $('leaderboard-status').textContent='Loading the best shifts…';
+ try{
+  const [directory,runs,hidden]=await Promise.all(['directory','runs','moderation'].map(path=>community.read(path)));
+  if(request!==boardRequest||currentRun!==runId||owner!==community.profile?.profileId)return;
+  const scores=topRuns(directory,runs,hidden,category);
+  $('leaderboard-status').textContent=scores.length?'':'The board is ready for its first score.';
+  for(const [index,r] of scores.entries()){
+   const row=document.createElement('li'),rank=document.createElement('span'),name=document.createElement('span'),score=document.createElement('b');
+   rank.textContent=String(index+1).padStart(2,'0');name.textContent=r.displayName;score.textContent=r.score.toLocaleString();
+   if(r.id===currentRun&&r.playerId===runOwner){row.className='your-run';name.textContent+=' · this shift';}
+   row.append(rank,name,score);$('top-scores').append(row);
+  }
+ }catch(e){if(request!==boardRequest)return;$('leaderboard-status').textContent='Scores are unavailable right now. Your game result is above.';$('retry-board').hidden=false;}
+}
+$('retry-board').addEventListener('click',loadLeaderboard);
+$('control-toggle').addEventListener('click',()=>{sim?.setLift(0);controlMenu=!controlMenu;dashboard=false;$('camera-panel').hidden=true;$('camera-toggle').setAttribute('aria-expanded','false');updateVisibility();});
+$('radial-close').addEventListener('click',()=>{sim?.setLift(0);controlMenu=false;updateVisibility();$('control-toggle').focus();});
+for(const b of document.querySelectorAll('[data-category]'))b.addEventListener('click',()=>{sim?.setLift(0);controlCategory=controlCategory===b.dataset.category?null:b.dataset.category;updateVisibility();});
+for(const b of document.querySelectorAll('[data-operation]'))b.addEventListener('click',()=>operate(b.dataset.operation));
+$('radial-bonus').addEventListener('click',()=>operate('bonus'));
+for(const b of document.querySelectorAll('[data-hold]')){
+ const id=b.dataset.hold;
+ b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);operate(id,'start');});
+ for(const event of ['pointerup','pointercancel','lostpointercapture','blur'])b.addEventListener(event,()=>operate(id,'end'));
+ b.addEventListener('keydown',e=>{if([' ','Enter'].includes(e.key)){e.preventDefault();operate(id,'start');}});
+ b.addEventListener('keyup',e=>{if([' ','Enter'].includes(e.key))operate(id,'end');});
+}
+for(const b of document.querySelectorAll('[data-preset]'))b.addEventListener('click',()=>{scene.setView(b.dataset.preset);syncViewLabel();saveCamera();});
 $('retry-save').addEventListener('click',saveResult);
 for(const id of ['start','again','restart'])$(id).addEventListener('click',start);
 $('resume').addEventListener('click',resume);$('pause').addEventListener('click',pause);$('quit').addEventListener('click',menu);$('result-menu').addEventListener('click',menu);
@@ -297,8 +347,8 @@ for(const id of ['raise','lower']){
  b.addEventListener('keyup',e=>{if([' ','Enter'].includes(e.key))operate(id,'end');});
  b.addEventListener('blur',()=>operate(id,'end'));
 }
-function toggleView(){if($('view').disabled)return;scene.setView(scene.view==='first'?'overhead':'first');syncViewLabel();}
-$('camera-toggle').addEventListener('click',()=>{const open=$('camera-panel').hidden;$('camera-panel').hidden=!open;$('camera-toggle').setAttribute('aria-expanded',String(open));});
+function toggleView(){const views=['first','overhead','machine'];scene.setView(views[(views.indexOf(scene.view)+1)%3]);syncViewLabel();saveCamera();}
+$('camera-toggle').addEventListener('click',()=>{const open=$('camera-panel').hidden;if(open){controlMenu=false;sim?.setLift(0);updateVisibility();}$('camera-panel').hidden=!open;$('camera-toggle').setAttribute('aria-expanded',String(open));});
 $('camera-close').addEventListener('click',()=>{$('camera-panel').hidden=true;$('camera-toggle').setAttribute('aria-expanded','false');});
 for(const b of document.querySelectorAll('[data-camera]'))b.addEventListener('click',()=>scene.cameraAction(b.dataset.camera));
 $('inspect-close').addEventListener('click',closeInspection);$('inspect-prev').addEventListener('click',()=>cycleInspection(-1));$('inspect-next').addEventListener('click',()=>cycleInspection(1));$('inspect-focus').addEventListener('click',()=>scene.focus(selectionId));$('inspect-reject').addEventListener('click',()=>confirmInspection(true));$('inspect-keep').addEventListener('click',()=>confirmInspection(false));
@@ -313,6 +363,8 @@ for(const [k,id]of [['music','music-volume'],['sfx','sfx-volume']]){$(id).value=
 $('reduced-fx').checked=reduced;$('reduced-fx').addEventListener('change',e=>{reduced=e.target.checked;localStorage.setItem('sujaReducedFx',String(reduced));updateVisibility();});
 window.addEventListener('keydown',e=>{
  if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)||(e.target.tagName==='BUTTON'&&[' ','Enter'].includes(e.key)))return;
+ if(e.key==='Escape'&&controlMenu){e.preventDefault();sim.setLift(0);controlMenu=false;updateVisibility();return;}
+ if(e.key==='Escape'&&!$('camera-panel').hidden){e.preventDefault();$('camera-panel').hidden=true;$('camera-toggle').setAttribute('aria-expanded','false');return;}
  if(e.key==='Escape'&&playing&&(!sim.ended||packing)){
   const open=[...document.querySelectorAll('dialog[open]')];if(open.some(d=>d.id!=='pause-dialog'))return;
   e.preventDefault();shiftPaused?resume():pause();return;
@@ -330,7 +382,7 @@ window.addEventListener('blur',()=>{sim?.setLift(0);if(playing)pause();});
 $('pause-dialog').addEventListener('cancel',e=>{e.preventDefault();resume();});$('results-dialog').addEventListener('cancel',e=>{e.preventDefault();menu();});
 community.subscribe(p=>{
  $('player-status').textContent=p?`Playing as ${p.displayName} · Your competitive shifts save to SUJA.`:'Guest play · Sign in at SUJA Game Center to save scores.';
- if(!playing){saveCamera();restorePreferences(p?.profileId||null);}
+ if(!playing){saveCamera();restorePreferences(p?.profileId||null);}if(pendingResult)loadLeaderboard();
 });
 community.init().then(async()=>{
  if(challengeCode){

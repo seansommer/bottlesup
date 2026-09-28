@@ -30,28 +30,30 @@ export class PlantControls {
     root.add(box(.8,.13,.75,M.steel,0,-.18,0),box(.13,1.25,.13,M.steel,0,-.82,0),box(.7,.12,.65,M.dark,0,-1.46,0));
     const head=makeControlHead(id);press=head.press;glow=head.glow;root.add(head.group);
    }
-   const label=placard(id.toUpperCase(),id==='load'?1.9:1.65,id);label.position.y=id==='load'?1.03:id==='bonus'?.66:.59;root.add(label);
+   const label=placard(id.toUpperCase(),id==='load'?1.9:1.65,id);label.visible=false;label.position.y=id==='load'?1.03:id==='bonus'?.66:.59;root.add(label);
    root.traverse(o=>o.userData.control=id);this.items.set(id,{root,press,glow,label,pressed:0});
   }
-  this.speedLabel=placard('FEEDER 50%',1.55);this.speedLabel.position.set(-4.95,2.65,2.35);this.group.add(this.speedLabel);
+  this.speedLabel=placard('FEEDER 50%',1.55);this.speedLabel.visible=false;this.speedLabel.position.set(-4.95,2.65,2.35);this.group.add(this.speedLabel);
   this.dial=cyl(.23,.23,.16,M.dark,-4.95,1.7,2.35,24);this.dial.add(box(.06,.025,.21,M.white,0,.095,-.02));this.group.add(this.dial);
   this.gatePads=INTAKE_SLOTS.map(z=>{const pad=cyl(.24,.24,.025,new THREE.MeshStandardMaterial({color:0xc5dccb,emissive:0x2fbc76,emissiveIntensity:0}),PLANT.gateX,1.452,z,24);scene.add(pad);return pad;});
-  this.gateLabel=placard('SIX-PACK 0 / 6',2);this.gateLabel.position.set(6.4,2.65,1.95);scene.add(this.gateLabel);
+  this.gateLabel=placard('SIX-PACK 0 / 6',2);this.gateLabel.visible=false;this.gateLabel.position.set(6.4,2.65,1.95);scene.add(this.gateLabel);
   this.makeRejectBin();
+  this.guides=['raise','lower','slower'].map((id,i)=>{const m=new THREE.Mesh(new THREE.TorusGeometry(i===2?1.5:1.2,.04,8,48),new THREE.MeshBasicMaterial({color:i===1?0xffc653:0x94ed6c,transparent:true,opacity:.8}));m.rotation.x=Math.PI/2;m.position.set(-4.2,i===2?1.48:1.7,i===2?-3.3:-5.9);scene.add(m);return{id,mesh:m};});
  }
  makeRejectBin(){
   this.rejectGroup=new THREE.Group();this.rejectGroup.position.set(5.3,0,3.5);this.scene.add(this.rejectGroup);
   const purple=new THREE.MeshStandardMaterial({color:0x8861b1,roughness:.65});this.rejectGroup.add(box(1.9,.12,1.6,M.dark,0,.08,0));
   for(const x of [-.92,.92])this.rejectGroup.add(box(.12,1.05,1.6,purple,x,.61,0));for(const z of [-.76,.76])this.rejectGroup.add(box(1.9,1.05,.1,purple,0,.61,z));
-  this.rejectContents=new THREE.Group();this.rejectGroup.add(this.rejectContents);this.rejectLabel=placard('REJECT BIN · 0',2.1);this.rejectLabel.position.set(0,1.7,0);this.rejectGroup.add(this.rejectLabel);
+  this.rejectContents=new THREE.Group();this.rejectGroup.add(this.rejectContents);this.rejectLabel=placard('0',.55);this.rejectLabel.position.set(0,1.2,.8);this.rejectGroup.add(this.rejectLabel);
  }
  press(id){const item=this.items.get(id);if(item)item.pressed=.16;}
- update(sim,dt,clock,active,reduced){
+ update(sim,dt,clock,active,reduced,inFlight=new Set()){
   this.states=controlState(sim,active);const pulse=reduced?1:.55+.45*Math.sin(clock*5);
-  for(const [id,item] of this.items){const state=this.states[id];item.root.visible=id!=='bonus'||!!sim.pendingReward;item.label.userData.setText(id==='inspect'&&this.inspecting?'INSPECT ON':state.label,state.glow);if(item.glow)item.glow.material.emissiveIntensity=state.glow?.4+pulse*1.2:state.enabled?.1:0;if(item.press){item.pressed=Math.max(0,item.pressed-dt);item.press.position.y=item.pressed>0?-.025:.04;item.press.material.opacity=state.enabled?1:.65;item.press.material.transparent=!state.enabled;}}
+  for(const [id,item] of this.items){const state=this.states[id];item.root.visible=id==='load'||id==='bonus'&&!!sim.pendingReward;item.label.userData.setText(id==='inspect'&&this.inspecting?'INSPECT ON':state.label,state.glow);if(item.glow)item.glow.material.emissiveIntensity=state.glow?.4+pulse*1.2:state.enabled?.1:0;if(item.press){item.pressed=Math.max(0,item.pressed-dt);item.press.position.y=item.pressed>0?-.025:.04;item.press.material.opacity=state.enabled?1:.65;item.press.material.transparent=!state.enabled;}}
+  for(const g of this.guides){g.mesh.visible=!!this.states[g.id]?.glow;g.mesh.material.opacity=.4+pulse*.5;}
   animateBonusCube(this.bonus,clock,!!sim.pendingReward,reduced);this.speedLabel.userData.setText(`FEEDER ${Math.round(sim.feeder*100)}%`);this.dial.rotation.y=(sim.feeder-.5)*Math.PI*1.5;
   const ready=intakeReady(sim.secondary),slots=new Set(ready.map(b=>b.gateSlot));this.gatePads.forEach((pad,i)=>pad.material.emissiveIntensity=slots.has(i)?.9:0);this.gateLabel.userData.setText(`SIX-PACK ${ready.length} / 6`,ready.length>=4);
-  if(this.rejectCount!==sim.rejectBinCount){this.rejectCount=sim.rejectBinCount;this.rejectLabel.userData.setText(`REJECT BIN · ${sim.rejectBinCount}`);this.rejectContents.clear();sim.rejectBinItems.forEach((b,i)=>{const m=this.models[b.juiceIndex][b.defect||'good'].clone();m.scale.setScalar(.65);m.rotation.z=Math.PI/2;m.rotation.y=(i%3-.8)*.4;m.position.set((i%3-1)*.43+.2,.34+Math.floor(i/6)*.3,(Math.floor(i/3)%2-.5)*.58);this.rejectContents.add(m);});}
+  const rejectKey=sim.rejectBinCount+':'+[...inFlight].join(',');if(this.rejectCount!==rejectKey){this.rejectCount=rejectKey;this.rejectLabel.userData.setText(String(sim.rejectBinCount));this.rejectContents.clear();sim.rejectBinItems.filter(b=>!inFlight.has(b.id)).forEach((b,i)=>{const m=this.models[b.juiceIndex][b.defect||'good'].clone();m.scale.setScalar(.65);m.rotation.z=Math.PI/2;m.rotation.y=(i%3-.8)*.4;m.position.set((i%3-1)*.43+.2,.34+Math.floor(i/6)*.3,(Math.floor(i/3)%2-.5)*.58);this.rejectContents.add(m);});}
  }
  hit(ray,camera,canvas,x,y,bottleMeshes){
   const roots=[...this.items.values()].filter(i=>i.root.visible).map(i=>i.root);

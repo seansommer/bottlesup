@@ -12,7 +12,7 @@ import {validCamera} from './shift-features.js';
 import {JUICES} from './simulation.js';
 export class FactoryScene{
  constructor(canvas,onPick,onControl=()=>{}){
-  this.kind='3d';this.interactionActive=false;this.intakes=[];
+  this.kind='3d';this.interactionActive=false;this.intakes=[];this.rejectFlights=[];
   this.canvas=canvas;this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.18;
   this.scene=new THREE.Scene();this.scene.background=new THREE.Color('#d8e8df');this.scene.fog=new THREE.Fog('#d8e8df',24,65);this.camera=new THREE.PerspectiveCamera(47,1,.1,90);this.ray=new THREE.Raycaster();this.pointer=new THREE.Vector2();this.view='first';this.meshes=new Map();this.pool=new Map();this.particles=[];this.clock=0;this.cameraTarget=new THREE.Vector3();this.intro=0;this.labels=JUICES.map(j=>this.label(j));this.models=JUICES.map((j,i)=>Object.fromEntries([null,'label','cap','fill'].map(d=>[d||'good',bottle({...j,texture:this.labels[i],defect:d})])));
   this.scene.add(new THREE.HemisphereLight(0xf1fff8,0x52675b,2.5));const sun=new THREE.DirectionalLight(0xfff7e7,4);sun.position.set(-4,13,8);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-12,right:12,top:13,bottom:-12,near:.5,far:40});sun.shadow.bias=-.001;sun.shadow.normalBias=.035;this.scene.add(sun);const rim=new THREE.DirectionalLight(0xbdc6ff,1.5);rim.position.set(5,8,-9);this.scene.add(rim);
@@ -39,7 +39,16 @@ export class FactoryScene{
  }
  buildPlant(){
   const floorMat=new THREE.MeshStandardMaterial({color:0x829c8d,roughness:.87});this.scene.add(box(55,.2,55,floorMat,0,-.14,0,0));const grid=new THREE.GridHelper(50,25,0x759383,0x97aca0);grid.position.y=-.03;this.scene.add(grid);
-  this.backWall=box(34,8,.25,new THREE.MeshStandardMaterial({color:0xe1eae3,roughness:1}),0,3.8,-11);this.leftWall=box(.3,8,26,M.white,-13,3.8,-2);this.scene.add(this.backWall,this.leftWall);
+  // Interior-facing surfaces keep the hall enclosed from within and let overhead cameras see through the near shell.
+  const wallMat=new THREE.MeshStandardMaterial({color:0xe1eae3,roughness:1});
+  const wall=(w,h,x,y,z,ry=0,rx=0)=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),wallMat);m.position.set(x,y,z);m.rotation.set(rx,ry,0);m.receiveShadow=true;this.scene.add(m);return m;};
+  this.backWall=wall(42,12,0,6,-14);this.leftWall=wall(38,12,-21,6,5,Math.PI/2);
+  this.frontWall=wall(42,12,0,6,24,Math.PI);this.rightWall=wall(38,12,21,6,5,-Math.PI/2);
+  this.ceiling=wall(42,38,0,12,5,0,Math.PI/2);
+  for(let x=-18;x<=18;x+=6){this.scene.add(box(.15,11.8,.15,M.steel,x,5.9,-13.8),box(.15,.22,37,M.steel,x,11.6,5));}
+  for(let z=-10;z<=20;z+=6)this.scene.add(box(40,.16,.16,M.steel,0,11.45,z));
+  this.belt(13,1.4,9,10);this.belt(2,8,16,4);
+  for(let i=0;i<6;i++){const spare=crate();spare.position.set(-14+(i%2)*3,0,3+Math.floor(i/2)*3);this.scene.add(spare);}
   for(let x=-12;x<17;x+=3)this.scene.add(box(.025,7.5,.03,M.steel,x,3.75,-10.84,0));
   const wordmark=this.textSign('suja',5,1.25,'#086139','#ffffff',178);wordmark.position.set(4.7,4.1,-10.8);this.scene.add(wordmark);const sign=this.textSign('BOTTLING HALL  /  01',4,.65,'#e1eae3','#246044',42);sign.position.set(4.7,3.06,-10.77);this.scene.add(sign);
   this.primary=this.belt(2.9,3.6,-4.2,-3.32);this.secondary=this.belt(PLANT.beltLength,PLANT.beltWidth,1,0);
@@ -67,6 +76,7 @@ export class FactoryScene{
  setView(view,notify=true){
   this.cameraUserDriven=false;this.flushCamera();this.cameraUserDriven=notify;this.view=view;this.intro=0;const narrow=this.camera.aspect<.8;
   if(this.packing){this.camera.position.set(16.05,narrow?12:7.6,narrow?18:11.5);this.controls.target.set(11.85,1.4,3.2);}
+  else if(view==='machine'){this.camera.position.set(narrow?13:12,narrow?10:6,narrow?12:8);this.controls.target.set(4.7,1.4,0);}
   else if(view==='overhead'){this.camera.position.set(.8,narrow?40:20,1.5);this.controls.target.set(.8,0,-2);}
   else{this.camera.position.set(narrow?.7:1.5,narrow?29:4.7,narrow?29:10.8);this.controls.target.set(narrow?.8:.1,1.2,-1.8);}
   this.flushCamera();
@@ -105,10 +115,15 @@ export class FactoryScene{
  hitControl(x,y){if(!this.interactionActive||this.packing)return null;const r=this.canvas.getBoundingClientRect();this.pointer.set((x-r.left)/r.width*2-1,-(y-r.top)/r.height*2+1);this.ray.setFromCamera(this.pointer,this.camera);return this.plantControls.hit(this.ray,this.camera,this.canvas,x,y,(this.simRef?.secondary||[]).map(b=>this.meshes.get(b.id)).filter(Boolean));}
  intake(event){for(const b of event.bottles){const source=this.meshes.get(b.id);if(!source)continue;const m=source.clone();this.scene.add(m);this.intakes.push({mesh:m,age:0});}}
 
+ reject(event){
+  const source=this.meshes.get(event.id);if(!source)return;
+  const mesh=source.clone();mesh.traverse(o=>{delete o.userData.bottleId;});this.scene.add(mesh);
+  this.rejectFlights.push({id:event.id,mesh,start:mesh.position.clone(),end:new THREE.Vector3(5.3,.6,3.5),rotation:mesh.rotation.z,age:0});
+ }
  burst(x,z,color=0x93f160){for(let i=0;i<10;i++){const m=box(.065,.065,.065,new THREE.MeshBasicMaterial({color}),x,2,z);this.scene.add(m);this.particles.push({m,v:new THREE.Vector3((Math.random()-.5)*2,1+Math.random()*2,(Math.random()-.5)*2),life:.7});}}
- render(sim,dt){if(this.simRef!==sim){for(const m of this.meshes.values())this.scene.remove(m);this.meshes.clear();for(const item of this.intakes)this.scene.remove(item.mesh);this.intakes=[];this.simRef=sim;}this.clock+=dt;
+ render(sim,dt){if(this.simRef!==sim){for(const m of this.meshes.values())this.scene.remove(m);this.meshes.clear();for(const item of this.intakes)this.scene.remove(item.mesh);this.intakes=[];for(const f of this.rejectFlights)this.scene.remove(f.mesh);this.rejectFlights=[];this.simRef=sim;}this.clock+=dt;
   if(this.intro>0){this.intro=Math.max(0,this.intro-dt);this.camera.position.copy(this.introPosition);this.camera.position.x+=this.intro*1.5;this.camera.position.y+=this.intro;}
-  this.controls.update();this.backWall.visible=this.camera.position.z> -10.6;this.leftWall.visible=this.camera.position.x> -12.6;
+  this.controls.update();
   const activeIds=new Set(sim.bottles.map(b=>b.id));for(const[id,m]of this.meshes){if(!activeIds.has(id)){this.scene.remove(m);this.meshes.delete(id);}}
   const loading=sim.binState==='loading'?Math.max(0,1-sim.loadTime/1.2):1;
   for(const b of sim.bottles){
@@ -119,7 +134,9 @@ export class FactoryScene{
   }
   const pose=dumperPose(sim.tilt,loading);this.dumper.rotation.x=pose.angle;this.dumper.position.set(pose.x,pose.y,pose.z);this.bin.visible=sim.binState!=='empty'||sim.tilt>5;this.jack.position.z=sim.binState==='loading'?-9+loading*2:-7;
   const selected=this.meshes.get(this.selectedId);this.selection.visible=!!selected&&!this.packing;if(selected){this.selection.position.set(selected.position.x,1.48,selected.position.z);}
-  this.packingScene.update(this.packing);this.plantControls.group.visible=!this.packing;this.plantControls.rejectGroup.visible=!this.packing;this.plantControls.gateLabel.visible=!this.packing;this.plantControls.gatePads.forEach(p=>p.visible=!this.packing);this.plantControls.update(sim,dt,this.clock,this.interactionActive,this.reduced);
+  this.packingScene.update(this.packing);this.plantControls.group.visible=!this.packing;this.plantControls.rejectGroup.visible=!this.packing;this.plantControls.gateLabel.visible=false;this.plantControls.gatePads.forEach(p=>p.visible=!this.packing);this.plantControls.update(sim,dt,this.clock,this.interactionActive,this.reduced,new Set(this.rejectFlights.map(f=>f.id)));
+  for(const f of this.rejectFlights){if(!sim.paused)f.age+=dt;const t=Math.min(1,f.age/1.15);f.mesh.position.lerpVectors(f.start,f.end,t);f.mesh.position.y+=Math.sin(t*Math.PI)*2;f.mesh.rotation.z=f.rotation+t*Math.PI*.8;if(t===1)this.scene.remove(f.mesh);}
+  this.rejectFlights=this.rejectFlights.filter(f=>f.age<1.15);
   for(const item of this.intakes){if(!sim.paused){item.age+=dt;item.mesh.position.x+=dt*3.8;}if(item.age>.85)this.scene.remove(item.mesh);}this.intakes=this.intakes.filter(item=>item.age<=.85);
   for(const belt of [this.primary,this.secondary]){const speed=sim.paused||sim.ended||sim.batchReady?0:belt===this.primary?sim.feeder*2.6:sim.stopped?0:sim.secondarySpeed;belt.phase=(belt.phase+speed*dt)%.18;for(let i=0;i<belt.slats.length;i++){const p=-(belt.longX?belt.w:belt.d)/2+i*.18+belt.phase;if(belt.longX)belt.slats[i].position.x=p;else belt.slats[i].position.z=p;}}
   for(let i=0;i<4;i++){const w=this.crew[i];w.visible=i<sim.helpers.length;w.userData.arms.forEach((a,j)=>a.rotation.x=-.55+Math.sin(this.clock*5+i+j)*.5);}

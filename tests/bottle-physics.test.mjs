@@ -21,7 +21,7 @@ test('one through five final stragglers earn half intake points, including shift
  }
 });
 test('reject bin counts manual, helper and machine defects without counting the same bottle twice',()=>{
- const s=new Simulation();const a=make(s,{defect:'cap'});s.action(a.id,true);s.action(a.id,true);s.action(make(s,{x:1}).id,true);const bad=make(s,{x:6.25,z:1.2,defect:'fill',jam:1.5});s.step(1/60);assert.equal(s.rejectBinCount,3);assert.equal(s.rejectBinBad,2);assert.equal(s.rejected,1);assert.equal(s.waste,1);assert.equal(s.bottles.includes(bad),false);assert.equal(s.rejectBinItems.length,3);
+ const s=new Simulation();const a=make(s,{defect:'cap'});s.action(a.id,true);s.action(a.id,true);s.action(make(s,{x:1}).id,true);const bad=make(s,{x:6.25,z:1.2,defect:'fill',jam:1.5});s.step(1/60);assert.equal(s.rejectBinCount,3);assert.equal(s.rejectBinBad,2);assert.equal(s.rejected,1);assert.equal(s.waste,0);assert.equal(s.bottles.includes(bad),false);assert.equal(s.rejectBinItems.length,3);
 });
 test('several busy shifts preserve collision bounds and keep completing six-packs',()=>{
  for(const seed of [17,73,120]){
@@ -38,4 +38,18 @@ test('several busy shifts preserve collision bounds and keep completing six-pack
   }
   assert.ok(checked>10000);assert.ok(s.level>=2,`seed ${seed}: the intake must not deadlock`);assert.ok(s.sixPacks>=9);assert.equal(s.delivered,s.sixPacks*6+s.stragglers);
  }
+});
+
+test('mixed defects and lying bottles clear the intake behind a partial good row',()=>{
+ for(const defect of ['cap','fill','label'])for(const up of [true,false]){
+  const s=new Simulation({mode:'practice'});s.binsLoaded=s.binsRequired;s.score=500;
+  row(s,4);make(s,{x:4,z:1.1,defect,up,rotation:1.3});make(s,{x:2,z:-.35});make(s,{x:1,z:.6});
+  for(let i=0;i<40*60;i++){s.step(1/60);for(const b of s.secondary)assert.ok(fits(b,s.secondary,SECONDARY_BOUNDS),`overlap with ${defect}, upright=${up}`);}
+  assert.equal(s.secondary.length,0);assert.equal(s.delivered,6);assert.equal(s.rejectBinBad,1);assert.equal(s.waste,0);assert.equal(s.batchReady,true);assert.equal(s.score,488);
+ }
+});
+test('a defect is penalized only at the machine, and a stop freezes intake rollers',()=>{
+ const s=new Simulation({mode:'practice'});s.score=100;const bad=make(s,{x:3.6,z:0,defect:'label'});advance(s,.1);assert.equal(s.score,100);assert.equal(s.rejectBinCount,0);
+ s.stopBelt();const p={x:bad.x,z:bad.z};advance(s,2);assert.equal(bad.x,p.x);assert.equal(bad.z,p.z);assert.equal(s.score,100);
+ advance(s,12);assert.equal(s.score,40);assert.equal(s.rejectBinCount,1);assert.equal(s.waste,0);
 });

@@ -30,10 +30,10 @@ export class Simulation{
  addBottle(){const r=this.random(),defect=r<.037?'label':r<.071?'cap':r<.10?'fill':null;const b={id:this.nextId++,belt:'primary',x:-4.2+(this.random()-.5)*2.2,z:-4.65,up:false,defect,rotation:this.random()*Math.PI*2,age:0,awarded:false,finicky:this.random()<.05,wobbleAt:5+this.random()*11,wobbled:false,entryOffset:(this.random()-.5)*.22};this.bottles.push(b);return b;}
  points(n){this.score=Math.max(0,Math.round(this.score+n));}
  action(id,reject=false,helper=false){if(this.ended||this.paused||this.batchReady)return false;const b=this.bottles.find(b=>b.id===id);if(!b||b.belt!=='secondary')return false;
-  if(reject){this.depositReject(b);this.bottles=this.bottles.filter(x=>x!==b);if(b.defect){this.rejected++;this.points(30*(this.fullFlow?3:1));this.rewardProgress++;this.event('reject',{id,good:true,x:b.x,z:b.z});}else{this.points(-25);this.combo=0;this.event('reject',{id,good:false,x:b.x,z:b.z});}return true;}
+  if(reject){this.depositReject(b);this.bottles=this.bottles.filter(x=>x!==b);if(b.defect){this.rejected++;this.points(30*(this.fullFlow?3:1));this.rewardProgress++;this.event('reject',{id,good:true,x:b.x,z:b.z,bottle:{...b},juiceIndex:(this.level-1)%4});}else{this.points(-25);this.combo=0;this.event('reject',{id,good:false,x:b.x,z:b.z,bottle:{...b},juiceIndex:(this.level-1)%4});}return true;}
   if(b.up)return false;b.up=true;b.rotation=0;let points=2;if(!b.awarded){b.awarded=true;this.stood++;if(!helper){this.combo=this.time-this.lastAction<2.5?this.combo+1:1;this.lastAction=this.time;this.maxCombo=Math.max(this.maxCombo,this.combo);}points=10*Math.min(4,1+Math.floor(this.combo/8));this.rewardProgress++;}points*=this.fullFlow?3:1;this.points(points);this.event('stand',{id,points,helper,x:b.x,z:b.z});return true;
  }
- loseBottle(b,why){if(why==='defect')this.depositReject(b);this.bottles=this.bottles.filter(x=>x!==b);this.waste++;this.combo=0;this.points(why==='defect'?-60:-35);this.event('waste',{why,id:b.id,x:b.x,z:b.z});if(this.mode!=='practice'&&this.waste>=RULES.wasteLimit)this.finish('Line overflow');}
+ loseBottle(b,why){if(why==='defect')this.depositReject(b);this.bottles=this.bottles.filter(x=>x!==b);if(why!=='defect')this.waste++;this.combo=0;this.points(why==='defect'?-60:-35);this.event('waste',{why,id:b.id,x:b.x,z:b.z});if(this.mode!=='practice'&&this.waste>=RULES.wasteLimit)this.finish('Line overflow');}
  award(){if(this.pendingReward)return;const kinds=['stop','helper','points','card','quality'];this.pendingReward=kinds[Math.floor(this.random()*kinds.length)];this.event('mystery');}
  openReward(){const kind=this.pendingReward;if(!kind||this.ended||this.paused||this.batchReady)return null;this.pendingReward=null;if(kind==='stop')this.stopUntil=Math.max(this.time,this.stopUntil)+8;if(kind==='helper'){if(this.helpers.length<4)this.helpers.push({until:this.time+25,next:this.time+.6,index:this.helpers.length});else this.points(250);}if(kind==='points')this.points(250);if(kind==='card')this.cards=Math.min(5,this.cards+1);if(kind==='quality')this.qualityUntil=this.time+18;this.event('reward',{kind});return kind;}
  step(dt){if(this.paused||this.ended||this.batchReady)return;dt=Math.min(.05,Math.max(0,dt));this.time+=dt;
@@ -61,7 +61,7 @@ export class Simulation{
     for(const rotation of [b.rotation,0,Math.PI/2,Math.PI/4]){const fallen={...b,up:false,rotation};if(fits(fallen,secondary,SECONDARY_BOUNDS)){b.up=false;b.rotation=rotation;b.wobbled=true;delete b.gateSlot;this.event('wobble',{id:b.id});break;}}
    }
    if((!b.up||b.defect)&&b.x+footprint(b).extentX>=SECONDARY_BOUNDS.maxX-.03){
-    b.jam=(b.jam||0)+dt;if(b.jam>1.5){this.loseBottle(b,b.defect?'defect':'fallen at machine');if(this.ended)return;}
+    if(!this.stopped){this.loseBottle(b,b.defect?'defect':'fallen at machine');if(this.ended)return;}
    }
   }
   const ready=intakeReady(this.secondary);

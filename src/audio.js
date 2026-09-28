@@ -33,7 +33,7 @@ export class AudioEngine {
   else if(name==='land'){this.tone(330+Math.random()*160,.06,.08,'triangle');this.noise(.045,.055,1800);}
   else if(name==='binEmpty'){notes([67,72],.13,.09);}
   else if(name==='rejectBin'){this.noise(.12,.1,780);this.tone(190,.09,.085,'triangle');}
-  else if(name==='reject'){this.tone(1000,.1,.1);}
+  else if(name==='reject'){this.noise(.34,.07,1500);notes([79,74,67],.14,.07);}
   else if(name==='feeder'){this.noise(.035,.07,2100);this.tone(430,.045,.06,'triangle');}
   else if(name==='stop'){this.noise(.3,.12,450);[240,175,120].forEach((f,i)=>this.tone(f,.13,.13,'sine',i*.08));}
   else if(name==='mystery'){notes([79,83,86,91],.11,.13);}

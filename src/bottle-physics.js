@@ -55,27 +55,29 @@ export function transferPosition(b,secondary){
 }
 export function intakeReady(bottles){return bottles.filter(b=>b.up&&!b.defect&&Number.isInteger(b.gateSlot)&&b.x>=PLANT.gateX-.025&&Math.abs(b.z-INTAKE_SLOTS[b.gateSlot])<.025);}
 export function moveSecondary(bottles,speed,dt){
+ if(!speed)return;
  const row=[...bottles].sort((a,b)=>b.x-a.x||a.id-b.id),taken=new Set();
- for(const b of row){if(!b.up||b.defect||taken.has(b.gateSlot))delete b.gateSlot;else if(Number.isInteger(b.gateSlot))taken.add(b.gateSlot);}
+ // Every bottle uses the intake rollers. Defects must be able to leave through
+ // a free slot instead of becoming a permanent obstacle behind a good row.
+ for(const b of row){if(!Number.isInteger(b.gateSlot)||b.gateSlot<0||b.gateSlot>=6||taken.has(b.gateSlot))delete b.gateSlot;else taken.add(b.gateSlot);}
  const queued=new Set(intakeReady(row).map(b=>b.id));
  let guide=row.find(b=>Number.isInteger(b.gateSlot)&&!queued.has(b.id));
  if(!guide){
-  guide=row.find(b=>b.up&&!b.defect&&!Number.isInteger(b.gateSlot)&&b.x>=4.1);
+  guide=row.find(b=>!Number.isInteger(b.gateSlot)&&b.x>=3.57);
   if(guide){const free=INTAKE_SLOTS.map((z,index)=>({z,index})).filter(s=>!taken.has(s.index)).sort((a,b)=>Math.abs(a.z-guide.z)-Math.abs(b.z-guide.z));if(free.length)guide.gateSlot=free[0].index;else guide=null;}
  }
  for(const b of row){
-  if(!speed)continue;
+  if(queued.has(b.id))continue;
   if(b===guide){
-   const target=INTAKE_SLOTS[b.gateSlot],alignX=5.65;
-   // The intake guide leaves a clear turning strip behind the collection row.
-   // Its rollers pull one bottle through, while the belt queues the next ones.
-   if(b.x<alignX-.001)moveBody(b,Math.min(1.2*dt,alignX-b.x),0,bottles,SECONDARY_BOUNDS);
-   else if(Math.abs(target-b.z)>1e-6)moveBody(b,0,Math.max(-1.1*dt,Math.min(1.1*dt,target-b.z)),bottles,SECONDARY_BOUNDS);
-   else moveBody(b,1.2*dt,0,bottles,SECONDARY_BOUNDS);
-  }else if(queued.has(b.id))continue;
-  else{
-   const waiting=b.up&&!b.defect,limit=waiting?Math.max(5.04,b.x):SECONDARY_BOUNDS.maxX;
-   const bounds=waiting?{...SECONDARY_BOUNDS,maxX:limit+BODY_RADIUS}:SECONDARY_BOUNDS;
+   const target=INTAKE_SLOTS[b.gateSlot],alignX=5.12;
+   // One bottle at a time gets the turning strip. Even a lying crooked-cap
+   // bottle has clearance from both the queue and the six-pack collection row.
+   if(b.x<alignX-.001)moveBody(b,Math.min(3.2*dt,alignX-b.x),0,bottles,SECONDARY_BOUNDS);
+   else if(!b.up&&Math.abs(b.rotation)>1e-6){const straight={...b,rotation:0};if(fits(straight,bottles,SECONDARY_BOUNDS))b.rotation=0;}
+   else if(Math.abs(target-b.z)>1e-6)moveBody(b,0,Math.max(-2.4*dt,Math.min(2.4*dt,target-b.z)),bottles,SECONDARY_BOUNDS);
+   else moveBody(b,3.2*dt,0,bottles,SECONDARY_BOUNDS);
+  }else{
+   const bounds={...SECONDARY_BOUNDS,maxX:Math.max(3.6,b.x)+footprint(b).extentX};
    moveBody(b,speed*dt,0,bottles,bounds);
   }
  }

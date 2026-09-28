@@ -36,11 +36,11 @@ export function validCamera(value){
   if(!value||value.version!==1)return null;
   if(value.kind==='3d'){
     const vector=v=>Array.isArray(v)&&v.length===3&&v.every(n=>Number.isFinite(n)&&Math.abs(n)<200);
-    if(!vector(value.position)||!vector(value.target)||!['first','overhead'].includes(value.view))return null;
+    if(!vector(value.position)||!vector(value.target)||!['first','overhead','machine'].includes(value.view))return null;
     const distance=Math.hypot(...value.position.map((n,i)=>n-value.target[i]));if(distance<2.5||distance>45)return null;
     return {version:1,kind:'3d',view:value.view,position:[...value.position],target:[...value.target]};
   }
-  if(value.kind==='2d'&&Number.isFinite(value.zoom)&&value.zoom>=.65&&value.zoom<=4.5&&Array.isArray(value.pan)&&value.pan.length===2&&value.pan.every(n=>Number.isFinite(n)&&Math.abs(n)<20)&&Number.isFinite(value.angle))return {version:1,kind:'2d',view:'overhead',zoom:value.zoom,pan:[...value.pan],angle:value.angle};
+  if(value.kind==='2d'&&Number.isFinite(value.zoom)&&value.zoom>=.65&&value.zoom<=4.5&&Array.isArray(value.pan)&&value.pan.length===2&&value.pan.every(n=>Number.isFinite(n)&&Math.abs(n)<20)&&Number.isFinite(value.angle))return {version:1,kind:'2d',view:['first','overhead','machine'].includes(value.view)?value.view:'overhead',zoom:value.zoom,pan:[...value.pan],angle:value.angle};
   return null;
 }
 export class PlayerPreferences {
