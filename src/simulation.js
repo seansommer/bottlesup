@@ -1,3 +1,4 @@
+import {nextBinAction} from './control-state.js';
 import {releaseBottle, stepDrop} from './dumper.js';
 import {PRIMARY_BOUNDS,SECONDARY_BOUNDS,footprint,fits,moveBody,settlePrimary,transferPosition,moveSecondary,intakeReady} from './bottle-physics.js';
 export const RULES = Object.freeze({ version: '1.0.0', shiftSeconds:180, wasteLimit:12, secondaryCapacity:50, primaryCapacity:48, fullFlowAt:34 });
@@ -14,7 +15,7 @@ export function juiceSpeedBonus(seconds,handled,mode='shift'){
 }
 export class Simulation{
  constructor({mode='shift',seed=12345,onEvent=()=>{}}={}){
-  this.mode=['shift','endless','practice','race'].includes(mode)?mode:'shift';this.juiceStartedAt=0;this.batchRejected=0;this.speedBonusTotal=0;this.splits=[];this.seed=seed;this.random=seededRandom(seed);this.onEvent=onEvent;this.time=0;this.level=1;this.score=0;this.waste=0;this.stood=0;this.rejected=0;this.delivered=0;this.maxCombo=0;this.combo=0;this.lastAction=-20;this.bottles=[];this.nextId=1;this.binsLoaded=0;this.binLeft=0;this.binState='empty';this.loadTime=0;this.tilt=0;this.lift=0;this.feeder=0.5;this.dumpCredit=0;this.transferCredit=0;this.stopUntil=0;this.cards=1;this.helpers=[];this.fullUntil=0;this.fullArmed=true;this.qualityUntil=0;this.rewardProgress=0;this.bestFullness=0;this.ended=false;this.paused=false;this.reason='';this.pendingReward=null;this.batchDelivered=0;this.batchReady=false;this.sixPacks=0;this.stragglers=0;this.rejectBinCount=0;this.rejectBinBad=0;this.rejectBinItems=[];
+  this.mode=['shift','endless','practice','race'].includes(mode)?mode:'shift';this.juiceStartedAt=0;this.batchRejected=0;this.speedBonusTotal=0;this.splits=[];this.seed=seed;this.random=seededRandom(seed);this.onEvent=onEvent;this.time=0;this.level=1;this.score=0;this.waste=0;this.stood=0;this.rejected=0;this.delivered=0;this.maxCombo=0;this.combo=0;this.lastAction=-20;this.bottles=[];this.nextId=1;this.binsLoaded=0;this.binLeft=0;this.binState='empty';this.loadTime=0;this.tilt=0;this.lift=0;this.tiltTarget=null;this.feeder=0.5;this.dumpCredit=0;this.transferCredit=0;this.stopUntil=0;this.cards=1;this.helpers=[];this.fullUntil=0;this.fullArmed=true;this.qualityUntil=0;this.rewardProgress=0;this.bestFullness=0;this.ended=false;this.paused=false;this.reason='';this.pendingReward=null;this.batchDelivered=0;this.batchReady=false;this.sixPacks=0;this.stragglers=0;this.rejectBinCount=0;this.rejectBinBad=0;this.rejectBinItems=[];
  }
  get juice(){return JUICES[(this.level-1)%JUICES.length];}
  get binsRequired(){if(this.mode==='race')return 2;return Math.min(4,2+Math.floor((this.level-1)/3));}
@@ -28,7 +29,13 @@ export class Simulation{
  get stopped(){return this.time<this.stopUntil;}
  event(type,data={}){this.onEvent({type,...data});}
  loadBin(){if(this.ended||this.paused||this.batchReady||this.binState!=='empty'||this.tilt>.1||this.binsLoaded>=this.binsRequired)return false;this.binState='loading';this.loadTime=1.2;this.binLeft=this.binSize;for(let i=0;i<this.binSize;i++){const b=this.addBottle();b.belt='bin';b.slot=i;}this.event('load');return true;}
- setLift(dir){this.lift=Math.sign(dir);}
+ setLift(dir){this.tiltTarget=null;this.lift=Math.sign(dir);}
+ tapBin(){
+  const action=nextBinAction(this);if(!action)return false;
+  if(this.tiltTarget!==null){this.setLift(0);return true;}
+  if(action==='load')return this.loadBin();
+  this.tiltTarget=action==='raise'?100:0;this.lift=action==='raise'?1:-1;return true;
+ }
  setFeeder(value){this.feeder=Math.max(0,Math.min(1,Number(value)||0));}
  stopBelt(){if(!this.cards||this.ended||this.paused||this.batchReady)return false;this.cards--;this.stopUntil=Math.max(this.time,this.stopUntil)+7;this.event('stop');return true;}
  addBottle(){const r=this.random(),defect=r<.037?'label':r<.071?'cap':r<.10?'fill':null;const b={id:this.nextId++,belt:'primary',x:-4.2+(this.random()-.5)*2.2,z:-4.65,up:false,defect,rotation:this.random()*Math.PI*2,age:0,awarded:false,finicky:this.random()<.05,wobbleAt:5+this.random()*11,wobbled:false,entryOffset:(this.random()-.5)*.22};this.bottles.push(b);return b;}
@@ -45,7 +52,8 @@ export class Simulation{
   if(this.time-this.lastAction>2.5)this.combo=0;
   if(this.binState==='loading'){this.loadTime-=dt;if(this.loadTime<=0){this.binState='ready';this.binLeft=this.binSize;this.binsLoaded++;this.event('loaded');}}
   if(this.binState!=='loading')this.tilt=Math.max(0,Math.min(100,this.tilt+this.lift*35*dt));
-  if(this.binState==='ready'&&this.tilt>42&&this.binLeft){this.dumpCredit+=dt*(1.2+(this.tilt-42)*.19);while(this.dumpCredit>=1&&this.binLeft){this.dumpCredit--;const b=this.bottles.findLast(b=>b.belt==='bin');if(!b)break;this.binLeft--;releaseBottle(b);}if(!this.binLeft){this.binState='empty';this.dumpCredit=0;this.event('binEmpty');}}
+  if(this.tiltTarget!==null&&Math.abs(this.tilt-this.tiltTarget)<.001)this.setLift(0);
+  if(this.binState==='ready'&&this.tilt>42&&this.binLeft){this.dumpCredit+=dt*(1.2+(this.tilt-42)*.19);while(this.dumpCredit>=1&&this.binLeft){this.dumpCredit--;const b=this.bottles.findLast(b=>b.belt==='bin');if(!b)break;this.binLeft--;releaseBottle(b);}if(!this.binLeft){this.binState='empty';this.dumpCredit=0;if(this.tiltTarget!==null)this.setLift(0);this.event('binEmpty');}}
   for(const b of this.bottles.filter(b=>b.belt==='falling')){if(stepDrop(b,dt,this.tilt)){if(this.bottles.filter(x=>x.belt==='primary').length>RULES.primaryCapacity||!settlePrimary(b,this.bottles)){this.loseBottle(b,'feeder overflow');if(this.ended)return;}else this.event('land',{id:b.id});}}
   const primary=this.bottles.filter(b=>b.belt==='primary').sort((a,b)=>b.z-a.z||a.id-b.id);
   for(const b of primary){

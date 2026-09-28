@@ -18,7 +18,7 @@ test('four-juice race completes once after four packing finishes, with fixed inv
  assert.equal(s.ended,true);assert.equal(s.reason,'Four-juice finish');assert.equal(s.time,240);assert.equal(s.result().completedJuices,4);assert.equal(s.speedBonusTotal,25600);assert.equal(events.filter(e=>e.type==='end').length,1);assert.equal(s.level,4);
 });
 test('cardboard slides exactly once between complete layers, never over the final layer',()=>{
- for(const packs of [6,7,12,13,18]){const p=new Palletizer(packs*6);p.auto=true;let sheets=0,previous='';for(let i=0;i<5000&&p.phase!=='done';i++){p.step(1/60);if(p.phase==='sheet'&&previous!=='sheet'){sheets++;assert.equal(p.stacked%6,0);assert.equal(p.wrap(),false);assert.equal(p.place(),false);}previous=p.phase;}assert.equal(p.stacked,packs);assert.equal(p.sheets,Math.floor((packs-1)/6));assert.equal(sheets,p.sheets);}
+ for(const packs of [4,5,8,9,12,13]){const p=new Palletizer(packs*6);p.auto=true;let sheets=0,previous='';for(let i=0;i<5000&&p.phase!=='done';i++){p.step(1/60);if(p.phase==='sheet'&&previous!=='sheet'){sheets++;assert.equal(p.stacked%4,0);assert.equal(p.wrap(),false);assert.equal(p.place(),false);}previous=p.phase;}assert.equal(p.stacked,packs);assert.equal(p.sheets,Math.floor((packs-1)/4));assert.equal(sheets,p.sheets);}
 });
 test('race board ranks completed total points first, speed breaks ties, failed races never rank',()=>{
  const run=(score,duration,completedJuices=4)=>({version:'1.0.0',mode:'race',score,duration,completedJuices,reason:completedJuices===4?'Four-juice finish':'Line overflow'});

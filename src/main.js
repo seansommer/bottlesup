@@ -96,7 +96,8 @@ function setFeeder(value){if(!canOperate())return;sim.setFeeder(Math.max(0,Math.
 function operate(id,phase='tap'){
  if(phase==='end'){if(id==='raise'||id==='lower')sim?.setLift(0);return;}
  if(!canOperate()||!controlState(sim)[id]?.enabled)return;
- if(id==='raise'||id==='lower')sim.setLift(id==='raise'?1:-1);
+ if(id==='bin')sim.tapBin();
+ else if(id==='raise'||id==='lower')sim.setLift(id==='raise'?1:-1);
  else if(id==='load')sim.loadBin();
  else if(id==='stop')sim.stopBelt();
  else if(id==='bonus')sim.openReward();
@@ -127,7 +128,7 @@ function confirmInspection(reject){
 }
 function beginPacking(bottles,juiceIndex,final=false){
  saveCamera();packing=new Palletizer(bottles,juiceIndex);packingFinal=final;shiftPaused=false;packingPhase=null;
- sim.setLift(0);closeInspection();scene.setPacking(packing);$('packing').hidden=false;$('bonus-status').hidden=true;
+ sim.setLift(0);closeInspection();scene.prepareJuice(!final&&!(mode==='race'&&sim.level===4)?sim.level%4:(sim.level-1)%4);scene.setPacking(packing);$('packing').hidden=false;$('bonus-status').hidden=true;
  $('packing-bonus').textContent='';$('packing-juice').textContent=sim.juice.name;updatePacking();updateVisibility();
  notice(final?'Finish your pallet. Your shift score is complete.':'Juice run complete — time to pack. The clock is paused.');
 }
@@ -182,7 +183,7 @@ function frame(now){
   accumulator+=dt;
   while(accumulator>=1/60){
    if(!shiftPaused){
-    if(countdown){countdown.step(1/60);updateCountdown();if(countdown.done){countdown=null;sim.paused=false;updateVisibility();}}
+    if(countdown){countdown.step(1/60);scene.updateIntro(countdown.elapsed/countdown.duration);updateCountdown();if(countdown.done){scene.endIntro();countdown=null;sim.paused=false;updateVisibility();}}
     else if(packing)packing.step(1/60);
     else sim.step(1/60);
    }
@@ -253,7 +254,7 @@ async function start(){
  $('menu').hidden=true;for(const id of ['hud','pause'])$(id).hidden=false;
  for(const d of document.querySelectorAll('dialog'))if(d.open)d.close();
  clearTimeout(eventTimer);$('event').hidden=true;
- countdown=new ShiftCountdown();countdownLabel='';sim.paused=true;
+ countdown=new ShiftCountdown();countdownLabel='';sim.paused=true;scene.startIntro(reduced);
  $('shift-phrase').textContent=phrases.next();updateCountdown();updateHud();updateVisibility();
 }
 function setReject(value){
@@ -273,7 +274,7 @@ function resume(){
  shiftPaused=false;sim.paused=sim.ended||!!countdown;audio.active=true;$('pause-dialog').close();audio.unlock();updateVisibility();
 }
 function menu(){
- saveCamera();scene.setPacking(null);packing=null;countdown=null;playing=false;boardRequest++;pendingResult=null;controlMenu=false;shiftPaused=false;audio.active=false;
+ saveCamera();scene.endIntro();scene.setPacking(null);packing=null;countdown=null;playing=false;boardRequest++;pendingResult=null;controlMenu=false;shiftPaused=false;audio.active=false;
  $('packing').hidden=true;closeInspection();$('camera-panel').hidden=true;$('camera-toggle').setAttribute('aria-expanded','false');
  for(const d of document.querySelectorAll('dialog'))d.close();
  for(const id of ['hud','pause','event','bonus-status'])$(id).hidden=true;

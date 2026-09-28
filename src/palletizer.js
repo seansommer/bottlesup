@@ -1,3 +1,4 @@
+import {PALLET} from './pallet-layout.js';
 export class Palletizer {
   constructor(bottles, juiceIndex = 0) {
     this.bottles = Math.max(0, Math.floor(bottles)); this.juiceIndex = juiceIndex;
@@ -13,7 +14,7 @@ export class Palletizer {
     if (this.progress < 1) return;
     if (this.phase === 'wrapping') this.phase = 'wrapped';
     else if(this.phase==='sheet'){this.sheets++;this.phase='ready';}
-    else {this.stacked++; this.phase = this.stacked === this.total ? 'done' : this.stacked%6===0 ? 'sheet' : 'ready';}
+    else {this.stacked++; this.phase = this.stacked === this.total ? 'done' : this.stacked%PALLET.casesPerLayer===0 ? 'sheet' : 'ready';}
     this.progress = 0;
   }
 }

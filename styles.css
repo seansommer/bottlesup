@@ -80,3 +80,6 @@ html,body{height:100%;height:100dvh;overscroll-behavior:none}body{display:flex;f
 @media(max-width:370px){.head-actions button{min-width:44px}.game-wordmark{font-size:.85rem}.topbar{gap:3px;padding-left:6px;padding-right:6px}}
 
 .speed-bonus{color:#773ba7;font:800 .85rem Outfit}.race-splits{background:#f0e6fc;border-radius:12px;padding:12px;margin:12px 0}.race-splits:empty{display:none}.race-splits h3{font:900 .9rem Outfit;margin:0 0 8px}.race-splits p{font-size:.74rem;margin:4px 0}.mode-picker{gap:5px}
+
+/* Keep the factory visible during the countdown camera sweep. */
+#countdown{background:linear-gradient(0deg,#082d356b,transparent 70%);backdrop-filter:none;align-items:end;padding-bottom:max(26px,env(safe-area-inset-bottom))}.countdown-card{color:white;text-shadow:0 2px 6px #073529}.countdown-card .eyebrow,.countdown-detail{color:#f5fff0}#countdown-number{font-size:clamp(4rem,12vw,7rem);color:#fcfff2;text-shadow:0 4px 0 #0c653a}#shift-phrase{margin:12px auto 6px}.countdown-detail{display:none}@media(max-height:570px){#countdown{padding:10px}#countdown-number{font-size:3.5rem}#shift-phrase{font-size:.85rem}}

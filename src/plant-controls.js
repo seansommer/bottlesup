@@ -23,7 +23,7 @@ export class PlantControls {
    const root=new THREE.Group();root.position.fromArray(position);this.group.add(root);let press,glow;
    if(id==='load'){
     const bin=crate();bin.scale.setScalar(.8);bin.position.set(0,-.8,0);root.add(bin);
-    for(let i=0;i<6;i++){const b=models[0].good.clone();b.scale.setScalar(.75);b.rotation.z=Math.PI/2;b.position.set((i%3-1)*.4,.4,(Math.floor(i/3)-.5)*.5);root.add(b);}
+    this.binJuices=new THREE.Group();root.add(this.binJuices);for(let i=0;i<6;i++){const b=models[0].good.clone();b.scale.setScalar(.75);b.rotation.z=Math.PI/2;b.position.set((i%3-1)*.4,.4,(Math.floor(i/3)-.5)*.5);this.binJuices.add(b);}
     glow=new THREE.Mesh(new THREE.BoxGeometry(1.96,.08,1.82),new THREE.MeshStandardMaterial({color:0x9cdbff,emissive:0x42baff,emissiveIntensity:0}));glow.position.y=-.73;root.add(glow);
    }else if(id==='bonus'){this.bonus=makeBonusCube();this.bonus.scale.setScalar(.68);root.add(this.bonus);}
    else{
@@ -31,7 +31,7 @@ export class PlantControls {
     const head=makeControlHead(id);press=head.press;glow=head.glow;root.add(head.group);
    }
    const label=placard(id.toUpperCase(),id==='load'?1.9:1.65,id);label.visible=false;label.position.y=id==='load'?1.03:id==='bonus'?.66:.59;root.add(label);
-   root.traverse(o=>o.userData.control=id);this.items.set(id,{root,press,glow,label,pressed:0});
+   root.traverse(o=>o.userData.control=id==='load'?'bin':id);this.items.set(id,{root,press,glow,label,pressed:0});
   }
   this.speedLabel=placard('FEEDER 50%',1.55);this.speedLabel.visible=false;this.speedLabel.position.set(-4.95,2.65,2.35);this.group.add(this.speedLabel);
   this.dial=cyl(.23,.23,.16,M.dark,-4.95,1.7,2.35,24);this.dial.add(box(.06,.025,.21,M.white,0,.095,-.02));this.group.add(this.dial);
@@ -46,10 +46,15 @@ export class PlantControls {
   for(const x of [-.92,.92])this.rejectGroup.add(box(.12,1.05,1.6,purple,x,.61,0));for(const z of [-.76,.76])this.rejectGroup.add(box(1.9,1.05,.1,purple,0,.61,z));
   this.rejectContents=new THREE.Group();this.rejectGroup.add(this.rejectContents);this.rejectLabel=placard('0',.55);this.rejectLabel.position.set(0,1.2,.8);this.rejectGroup.add(this.rejectLabel);
  }
+ setBinTarget(target){this.binTarget=target;target.traverse(o=>o.userData.control='bin');}
+ setJuice(index){
+  if(this.juiceIndex===index)return;this.juiceIndex=index;this.binJuices.clear();
+  for(let i=0;i<6;i++){const b=this.models[index].good.clone();b.scale.setScalar(.75);b.rotation.z=Math.PI/2;b.position.set((i%3-1)*.4,.4,(Math.floor(i/3)-.5)*.5);b.traverse(o=>o.userData.control='bin');this.binJuices.add(b);}
+ }
  press(id){const item=this.items.get(id);if(item)item.pressed=.16;}
  update(sim,dt,clock,active,reduced,inFlight=new Set()){
   this.states=controlState(sim,active);const pulse=reduced?1:.55+.45*Math.sin(clock*5);
-  for(const [id,item] of this.items){const state=this.states[id];item.root.visible=id==='load'||id==='bonus'&&!!sim.pendingReward;item.label.userData.setText(id==='inspect'&&this.inspecting?'INSPECT ON':state.label,state.glow);if(item.glow)item.glow.material.emissiveIntensity=state.glow?.4+pulse*1.2:state.enabled?.1:0;if(item.press){item.pressed=Math.max(0,item.pressed-dt);item.press.position.y=item.pressed>0?-.025:.04;item.press.material.opacity=state.enabled?1:.65;item.press.material.transparent=!state.enabled;}}
+  for(const [id,item] of this.items){const state=this.states[id==='load'?'bin':id];item.root.visible=id==='load'||id==='bonus'&&!!sim.pendingReward;item.label.userData.setText(id==='inspect'&&this.inspecting?'INSPECT ON':state.label,state.glow);if(item.glow)item.glow.material.emissiveIntensity=state.glow?.4+pulse*1.2:state.enabled?.1:0;if(item.press){item.pressed=Math.max(0,item.pressed-dt);item.press.position.y=item.pressed>0?-.025:.04;item.press.material.opacity=state.enabled?1:.65;item.press.material.transparent=!state.enabled;}}
   for(const g of this.guides){g.mesh.visible=!!this.states[g.id]?.glow;g.mesh.material.opacity=.4+pulse*.5;}
   animateBonusCube(this.bonus,clock,!!sim.pendingReward,reduced);this.speedLabel.userData.setText(`FEEDER ${Math.round(sim.feeder*100)}%`);this.dial.rotation.y=(sim.feeder-.5)*Math.PI*1.5;
   const ready=intakeReady(sim.secondary),slots=new Set(ready.map(b=>b.gateSlot));this.gatePads.forEach((pad,i)=>pad.material.emissiveIntensity=slots.has(i)?.9:0);this.gateLabel.userData.setText(`SIX-PACK ${ready.length} / 6`,ready.length>=4);
@@ -57,9 +62,10 @@ export class PlantControls {
  }
  hit(ray,camera,canvas,x,y,bottleMeshes){
   const roots=[...this.items.values()].filter(i=>i.root.visible).map(i=>i.root);
+  if(this.binTarget?.visible)roots.push(this.binTarget);
   const direct=ray.intersectObjects([...roots,...bottleMeshes],true)[0];if(direct){const id=direct.object.userData.control;if(id&&this.states[id]?.enabled)return id;if(direct.object.userData.bottleId)return null;}
   const r=canvas.getBoundingClientRect();let nearest=null,distance=25;
-  for(const [id,item] of this.items){if(!this.states[id]?.enabled||!item.root.visible)continue;const p=item.root.position.clone().project(camera);if(p.z< -1||p.z>1)continue;const d=Math.hypot(r.x+(p.x+1)*r.width/2-x,r.y+(1-p.y)*r.height/2-y);if(d<distance){distance=d;nearest=id;}}
+  for(const [id,item] of this.items){const action=id==='load'?'bin':id;if(!this.states[action]?.enabled||!item.root.visible)continue;const p=item.root.position.clone().project(camera);if(p.z< -1||p.z>1)continue;const d=Math.hypot(r.x+(p.x+1)*r.width/2-x,r.y+(1-p.y)*r.height/2-y);if(d<distance){distance=d;nearest=action;}}
   return nearest;
  }
 }
