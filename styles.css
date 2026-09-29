@@ -85,3 +85,27 @@ html,body{height:100%;height:100dvh;overscroll-behavior:none}body{display:flex;f
 #countdown{background:linear-gradient(0deg,#082d356b,transparent 70%);backdrop-filter:none;align-items:end;padding-bottom:max(26px,env(safe-area-inset-bottom))}.countdown-card{color:white;text-shadow:0 2px 6px #073529}.countdown-card .eyebrow,.countdown-detail{color:#f5fff0}#countdown-number{font-size:clamp(4rem,12vw,7rem);color:#fcfff2;text-shadow:0 4px 0 #0c653a}#shift-phrase{margin:12px auto 6px}.countdown-detail{display:none}@media(max-height:570px){#countdown{padding:10px}#countdown-number{font-size:3.5rem}#shift-phrase{font-size:.85rem}}
 
 .menu-links{flex-wrap:wrap}#share-status{overflow-wrap:anywhere;user-select:text}
+
+/* Shared appearance setting also themes game menus and utility panels. */
+:root[data-theme=dark]{color:#e4f0e2;background:#081a12;--green:#68bb82;--purple:#c79bea;--muted:#aec4af}
+[data-theme=dark] .menu-card,[data-theme=dark] dialog,[data-theme=dark] .dialog-card{background:#11291d;color:#e4f0e2;border-color:#35543b}
+[data-theme=dark] .menu-card{box-shadow:0 28px 90px #0009}
+[data-theme=dark] button,[data-theme=dark] .secondary{background:#213e2b;color:#e4f0e2}
+[data-theme=dark] .primary{background:#197348;color:white}
+[data-theme=dark] .text-button,[data-theme=dark] .menu-links button,[data-theme=dark] .close{background:transparent}
+[data-theme=dark] .mode-picker button{border-color:#35543b}
+[data-theme=dark] .mode-picker .selected,[data-theme=dark] .button-row .selected{background:#285139;color:#def4cf;border-color:#83bd6d}
+[data-theme=dark] .utility-panel,[data-theme=dark] .work-panel,[data-theme=dark] #controls,[data-theme=dark] #radial-panel,[data-theme=dark] .corner-tool{background:#11291df2;color:#e4f0e2;border-color:#35543b}
+[data-theme=dark] .inspection-note,[data-theme=dark] .inspection-nav span{color:#aec4af}
+[data-theme=dark] .result-grid>div,[data-theme=dark] #top-scores li:nth-child(odd){background:#213e2b}
+[data-theme=dark] #top-scores li.your-run,[data-theme=dark] .race-splits{background:#382448;color:#eadcf4}
+[data-theme=dark] #hint{background:#11291deb;color:#e4f0e2}
+[data-theme=dark] #countdown{background:#081a127a}
+[data-theme=dark] #bonus-status{background:#382448;color:#eadcf4}
+[data-theme=dark] #quick-inspect.selected,[data-theme=dark] .reject-confirm{background:#7940ab;color:white}
+[data-theme=dark] .radial-tools button{background:var(--control-light);color:var(--control-color)}
+[data-theme=dark] .radial-categories button{background:#dcebd6;color:#225f3a}
+[data-theme=dark] .camera-presets .selected{background:#197348;color:white}
+[data-theme=dark] .flow-track{background:#173e2b}
+
+.suite-header{padding-top:calc(7px + env(safe-area-inset-top))}

@@ -1,3 +1,4 @@
+import{initGameHeader}from'./game-header.js';
 import {topRuns} from './leaderboard.js';
 import {Palletizer} from './palletizer.js';
 import {CompatibilityScene} from './fallback.js';
@@ -369,6 +370,7 @@ for(const [k,id]of [['music','music-volume'],['sfx','sfx-volume']]){$(id).value=
 $('reduced-fx').checked=reduced;$('reduced-fx').addEventListener('change',e=>{reduced=e.target.checked;localStorage.setItem('sujaReducedFx',String(reduced));updateVisibility();});
 window.addEventListener('keydown',e=>{
  if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)||(e.target.tagName==='BUTTON'&&[' ','Enter'].includes(e.key)))return;
+ if(document.querySelector('.suite-dialog[open]'))return;
  if(e.key==='Escape'&&controlMenu){e.preventDefault();sim.setLift(0);controlMenu=false;updateVisibility();return;}
  if(e.key==='Escape'&&!$('camera-panel').hidden){e.preventDefault();$('camera-panel').hidden=true;$('camera-toggle').setAttribute('aria-expanded','false');return;}
  if(e.key==='Escape'&&playing&&(!sim.ended||packing)){
@@ -415,3 +417,5 @@ $('share-game').addEventListener('click',async()=>{
  try{await navigator.clipboard.writeText(data.url);status.textContent='Bottles Up! link copied. Ready to share.';}
  catch{status.textContent=`Copy this link to share: ${data.url}`;}
 });
+
+initGameHeader({community,pause,resume,menu,isRunning:()=>playing&&(!sim.ended||!!packing)});

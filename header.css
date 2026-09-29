@@ -1,0 +1,44 @@
+/* Shared SUJA navigation: game home, hub, player card, appearance. */
+:root{--suite-bg:#fbfdfb;--suite-soft:#eaf1e8;--suite-ink:#193e2b;--suite-muted:#5e7566;--suite-line:#d8e5d2;--suite-accent:#8042b6;color-scheme:light}
+:root[data-theme=dark]{--suite-bg:#11291d;--suite-soft:#213e2b;--suite-ink:#e4f0e2;--suite-muted:#aec4af;--suite-line:#35543b;--suite-accent:#c79bea;color-scheme:dark}
+.suite-header{height:auto;min-height:60px;flex:none;display:flex;align-items:center;gap:12px;padding:calc(7px + env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) 7px max(14px,env(safe-area-inset-left));background:var(--suite-bg);color:var(--suite-ink);border-bottom:1px solid var(--suite-line);position:relative;z-index:10;font-family:'DM Sans',system-ui,sans-serif}
+.suite-header .suite-home{display:flex;align-items:center;gap:10px;color:inherit;min-width:0;margin-right:auto;text-decoration:none;flex-shrink:1}
+.suite-home img{width:44px;height:44px;border-radius:12px;display:block;flex:none}
+.suite-title{font-size:1.04rem;font-weight:800;letter-spacing:-.035em;line-height:1.1;white-space:nowrap}
+.suite-title em{font-style:normal;color:var(--suite-accent)}
+.suite-title small{display:block;font-size:.55rem;letter-spacing:.13em;font-weight:700;margin-top:5px}
+.suite-header .suite-actions,.suite-header .game-tools{display:flex;align-items:center;gap:7px;margin:0;flex:none}
+.suite-header .suite-icon,.suite-header .game-tools button{display:grid;place-items:center;padding:0;width:44px;min-width:44px;height:44px;min-height:44px;border-radius:50%;background:var(--suite-soft);color:var(--suite-ink);border:1px solid transparent;font:700 1.15rem system-ui;text-decoration:none}
+.suite-header .suite-hub{background:transparent;border-radius:12px}
+.suite-hub img{width:36px;height:36px;border-radius:10px;display:block}
+.suite-icon svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.suite-header .suite-player{display:flex;align-items:center;gap:8px;max-width:190px;height:44px;padding:4px 12px 4px 4px;background:var(--suite-soft);color:var(--suite-ink);border:1px solid transparent;border-radius:24px;white-space:nowrap;font:700 .78rem 'DM Sans',system-ui}
+.suite-header .suite-avatar{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:50%;background:#197348;color:white;font-size:.72rem;letter-spacing:.02em}
+.suite-player-name{max-width:115px;overflow:hidden;text-overflow:ellipsis}
+.suite-header a:focus-visible,.suite-header button:focus-visible{outline:3px solid var(--suite-accent);outline-offset:2px}
+.suite-header a:hover,.suite-header button:hover{filter:brightness(.94)}
+.suite-header .game-tools{padding-left:12px;border-left:1px solid var(--suite-line)}
+.suite-dialog{font-family:'DM Sans',system-ui,sans-serif;background:var(--suite-bg);color:var(--suite-ink);border:1px solid var(--suite-line);width:min(500px,calc(100vw - 28px));padding:28px;border-radius:22px}
+.suite-dialog h2{font:800 1.85rem/1.12 'DM Sans',system-ui;margin:12px 0 20px;overflow-wrap:anywhere}
+.suite-dialog p{font-size:.85rem;line-height:1.6;color:var(--suite-muted)}
+.suite-dialog .suite-kicker{font-size:.6rem;letter-spacing:.15em;font-weight:800;margin:14px 0 0}
+.suite-dialog .suite-card-avatar{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:#197348;color:#fff;font-size:1.2rem;font-weight:800}
+.suite-dialog .suite-close{position:absolute;right:12px;top:12px;width:44px;height:44px;padding:0;font:400 1.7rem system-ui;border-radius:50%;background:var(--suite-soft);color:var(--suite-ink)}
+.suite-card-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:20px 0}
+.suite-card-stats div{background:var(--suite-soft);padding:12px 6px;border-radius:12px;text-align:center}
+.suite-card-stats strong{display:block;font-size:1.3rem}
+.suite-card-stats span{display:block;font-size:.62rem;color:var(--suite-muted);margin-top:5px}
+.suite-dialog .suite-card-link,.suite-dialog .suite-confirm,.suite-dialog .suite-cancel{display:block;text-align:center;width:100%;padding:13px;border-radius:12px;margin-top:12px;font:700 .85rem 'DM Sans',system-ui;text-decoration:none;background:var(--suite-soft);color:var(--suite-ink)}
+.suite-dialog .suite-confirm{background:#197348;color:white}
+@media(max-width:760px){
+ .suite-header{gap:7px;flex-wrap:wrap;padding-left:max(10px,env(safe-area-inset-left));padding-right:max(10px,env(safe-area-inset-right))}
+ .suite-header .suite-home{gap:7px}
+ .suite-title{font-size:.94rem}
+ .suite-header .suite-actions{gap:4px}
+ .suite-header .suite-player{max-width:118px;padding-right:9px;gap:6px}
+ .suite-player-name{max-width:63px}
+ .suite-header .game-tools{border-left:0;border-top:1px solid var(--suite-line);padding:3px 0 0;width:100%;justify-content:flex-end;gap:8px}
+ .suite-header .game-tools button{height:44px;min-height:44px;width:44px;background:transparent}
+}
+@media(max-width:390px){.suite-title{font-size:.83rem}.suite-header .suite-player{width:44px;padding:4px;justify-content:center}.suite-player-name{display:none}.suite-title small{font-size:.48rem}}
+@media(max-height:550px) and (orientation:landscape){.suite-header{flex-wrap:nowrap;gap:7px}.suite-header .suite-title{display:none}.suite-header .game-tools{width:auto;border-top:0;border-left:1px solid var(--suite-line);padding:0 0 0 7px}.suite-header .suite-player{max-width:120px}.suite-header .game-tools button{height:44px}}
