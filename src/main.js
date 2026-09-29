@@ -404,3 +404,14 @@ community.init().then(async()=>{
 if('serviceWorker'in navigator)navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
 // Read-only snapshots are opt-in and contain no identity or score-writing controls.
 if(query.get('debug')==='1')window.bottlesDebug={snapshot:()=>({...sim.result(),bottles:sim.bottles.map(b=>({...b})),tilt:sim.tilt,binLeft:sim.binLeft,binState:sim.binState,feeder:sim.feeder,batchReady:sim.batchReady,batchDelivered:sim.batchDelivered,paused:sim.paused,inspection:selectionId,countdown:countdown?.label,queue:sim.queueCount,rejectBin:sim.rejectBinCount,packing:packing?{bottles:packing.bottles,total:packing.total,loose:packing.loose,stacked:packing.stacked,phase:packing.phase}:null}),project:id=>scene.project(id)};
+
+$('share-game').addEventListener('click',async()=>{
+ const url=new URL('https://seansommer.github.io/sujagamecenter/bottles-up.html');
+ const code=(new URL(location.href).searchParams.get('challenge')||'').trim().toUpperCase();
+ if(/^[A-Z0-9]{6}$/.test(code))url.searchParams.set('challenge',code);
+ const data={title:'Bottles Up!',text:'Stand them up. Rack up the points. Created by Paul Cruz.',url:url.href};
+ if(navigator.share){try{await navigator.share(data);return;}catch(e){if(e.name==='AbortError')return;}}
+ const status=$('share-status');status.hidden=false;
+ try{await navigator.clipboard.writeText(data.url);status.textContent='Bottles Up! link copied. Ready to share.';}
+ catch{status.textContent=`Copy this link to share: ${data.url}`;}
+});
